@@ -42,17 +42,18 @@ double p;							// Similarity level
 int w;								// Weight
 int upperBound;						//Upper bound of seed lengths
 int cl;							//Minimum run length of consecutive 1s required in a shape
-const int STALE_LIMIT = 600;		//Stop search after this many tries without improvement
-const int SEARCH_TRIES = 2000;	//Maximum random restart attempts
-const int LOCAL_SEARCH_STEPS = 40;	//Local search iterations after each improvement
-const int LOCAL_SEARCH_STALE = 15;	//Stop local search after this many steps without gain
-const int POLISH_STEPS = 50;		//Final polish local search steps
-const int POLISH_STALE = 20;		//Final polish stale limit
+const int STALE_LIMIT = 5000;		//Stop search after this many tries without improvement
+const int SEARCH_TRIES = 12000;	//Maximum random restart attempts
+const int LOCAL_SEARCH_STEPS = 100;	//Local search iterations after each improvement
+const int LOCAL_SEARCH_STALE = 30;	//Stop local search after this many steps without gain
+const int POLISH_STEPS = 120;		//Final polish local search steps
+const int POLISH_STALE = 40;		//Final polish stale limit
 const int FIND_OPTIMAL_MAIN = 80;	//findOptimal trials on a new batch best
-const int FIND_OPTIMAL_LOCAL = 40;	//findOptimal trials during local search
-const int FIND_OPTIMAL_POLISH = 80;	//findOptimal trials in final polish
+const int FIND_OPTIMAL_LOCAL = 80;	//findOptimal trials during local search
+const int FIND_OPTIMAL_POLISH = 200;	//findOptimal trials in final polish
 const double LOCAL_WALK_MARGIN = 0.0015;	//Accept near-best local moves and continue from them
 const int PARALLEL_BATCH = 20;		//Restart batch size for OpenMP parallel search
+const int ELITE_MAX = 16;			//Pool of improving sets for seed-wise crossover
 bool mode;							// mode decides if sensitivity (0) or estimated sensitivity (1) will be used.
 bool bestMode = 0;					// variable used to control print statement
 int estCount = 0;					// variable used to control print statement
@@ -60,6 +61,7 @@ double optimized_best = 0.0;		// holds the best sensitivity obtained in the func
 int original_m = 0;					// resets the m value in adaptive length algorithm
 int original_M = 0;					// resets the M value in adaptive length algorithm
 bool isRegionCreated = false;		// makes sure homologous_array is created only once
+bool require_symmetry = false;		// if true, append each best seed's reverse and recompute sensitivity
 
 int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS);
 double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate = NULL);
@@ -490,6 +492,31 @@ bool is_valid_add_position(const char* s, int pos)
 	return pos <= core_lo || pos >= core_lo + cl;
 }
 
+static inline void reverse_copy_seed(const char* src, char* dst, int len)
+{
+	for (int i = 0; i < len; ++i)
+		dst[i] = src[len - 1 - i];
+	dst[len] = '\0';
+}
+
+// Build a 2k set: the original seeds followed by each seed reversed.
+char** expand_with_reverses(char** seeds, int* lens, int nSeeds, int* outCount)
+{
+	int n = nSeeds * 2;
+	char** out = new char* [n];
+	for (int i = 0; i < nSeeds; ++i) {
+		int len = lens ? lens[i] : (int)strlen(seeds[i]);
+		out[i] = new char[100];
+		out[nSeeds + i] = new char[100];
+		for (int j = 0; j <= len; ++j)
+			out[i][j] = seeds[i][j];
+		reverse_copy_seed(seeds[i], out[nSeeds + i], len);
+	}
+	if (outCount)
+		*outCount = n;
+	return out;
+}
+
 void copy_seed_set(char** dst, char** src, int* dstLen, int* srcLen, int nSeeds)
 {
 	for (int i = 0; i < nSeeds; ++i) {
@@ -587,6 +614,32 @@ void place_flank_ones(char** seeds, int* length, int nSeeds, int si, int weight,
 		}
 		seeds[si][pos] = '1';
 		placed++;
+	}
+}
+
+void place_uniform_flank_ones(char* seed, int len, int weight, int coreLo, int coreHi)
+{
+	int placed = 0;
+	for (int j = 0; j < len; ++j)
+		if (seed[j] == '1')
+			placed++;
+	int guard = 0;
+	while (placed < weight && guard < 20000) {
+		int pos = ale_rand() % len;
+		guard++;
+		if (pos >= coreLo && pos < coreHi)
+			continue;
+		if (seed[pos] == '0') {
+			seed[pos] = '1';
+			placed++;
+		}
+	}
+	while (placed < weight) {
+		int pos = ale_rand() % len;
+		if (seed[pos] == '0') {
+			seed[pos] = '1';
+			placed++;
+		}
 	}
 }
 
@@ -740,9 +793,9 @@ bool apply_local_mutation(char** seeds, int* l, int nSeeds)
 	bool moved = false;
 	for (int m = 0; m < nMoves; ++m) {
 		int choice = ale_rand() % 8;
-		if (choice <= 5)
+		if (choice < 5)
 			moved = local_swap_outside_core(seeds, l, nSeeds) || moved;
-		else if (choice <= 4) {
+		else if (choice < 7) {
 			int si = ale_rand() % nSeeds;
 			int dir = (ale_rand() % 2 == 0) ? -1 : 1;
 			moved = shift_seed_core(seeds, l, si, dir) || moved;
@@ -974,7 +1027,7 @@ void init_seeds_with_core(int weight, int* length, char** seeds, int nSeeds)
 		int start = find_leftmost_core_start(seeds[i]);
 		if (start < 0)
 			start = 0;
-		place_flank_ones(seeds, length, nSeeds, i, weight, start, start + cl);
+		place_uniform_flank_ones(seeds[i], length[i], weight, start, start + cl);
 	}
 }
 
@@ -1014,7 +1067,7 @@ void init_seeds_spread_cores(int weight, int* length, char** seeds, int nSeeds, 
 		int start = find_leftmost_core_start(seeds[i]);
 		if (start < 0)
 			start = 0;
-		place_flank_ones(seeds, length, nSeeds, i, weight, start, start + cl);
+		place_uniform_flank_ones(seeds[i], length[i], weight, start, start + cl);
 	}
 }
 
@@ -1594,6 +1647,22 @@ void randomize_seed_lengths(int* length_arr, int nSeeds, int m_val, int M_val, i
 		length_arr[i] = lo + ale_rand() % (hi - lo + 1);
 }
 
+void pick_restart_lengths(int* length_arr, int nSeeds, int weight, int perm)
+{
+	int hi = upperBound;
+	if (hi > (int)N - 1) hi = (int)N - 1;
+	int lo = weight;
+	if (lo < cl) lo = cl;
+	if (lo > hi) lo = hi;
+	if (perm % 2 == 0) {
+		for (int i = 0; i < nSeeds; i++)
+			length_arr[i] = hi;
+		return;
+	}
+	for (int i = 0; i < nSeeds; i++)
+		length_arr[i] = lo + ale_rand() % (hi - lo + 1);
+}
+
 void MAKE_L(int m, int M)
 {
 	assign_seed_lengths(l, k, m, M);
@@ -1741,7 +1810,6 @@ int remove_position(char** S, int* l, int NO_SEEDS, long long N){
 	}
 
 	int length = l[seed_no];
-	//length--;
 	l[seed_no] = length - 1;
 	char temp[length - 1];
 	for(int i = 0; i < pos; i++)
@@ -1949,6 +2017,21 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 		haveGlobalBest = true;
 	}
 
+	char*** elite = new char** [ELITE_MAX];
+	int** eliteLen = new int* [ELITE_MAX];
+	int nElite = 0, elitePos = 0;
+	for (int e = 0; e < ELITE_MAX; ++e) {
+		elite[e] = new char* [nSeeds];
+		eliteLen[e] = new int [nSeeds];
+		for (int si = 0; si < nSeeds; ++si)
+			elite[e][si] = new char[100];
+	}
+	if (haveGlobalBest) {
+		copy_seed_set(elite[0], globalBest, eliteLen[0], globalBestLen, nSeeds);
+		nElite = 1;
+		elitePos = 1 % ELITE_MAX;
+	}
+
 	#if defined(_OPENMP)
 	cout << "Parallel restarts enabled (" << omp_get_max_threads() << " threads)." << endl;
 	#endif
@@ -1979,30 +2062,39 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 			for (int si = 0; si < nSeeds; ++si)
 				localSeeds[si] = new char[100];
 
-			int pin = upperBound;
-			if (pin < weight) pin = weight;
-			if (pin < cl) pin = cl;
-			if (pin > (int)N) pin = (int)N;
-			for (int si = 0; si < nSeeds; ++si)
-				localLen[si] = pin;
+			pick_restart_lengths(localLen, nSeeds, weight, k);
 
 			bool doPerturb = false;
+			bool doCrossover = false;
 			#if defined(_OPENMP)
-			#pragma omp critical(read_global_best)
+			#pragma omp critical(search_update)
 			#endif
 			{
-				doPerturb = haveGlobalBest && badMove > 0 && (k % 7 == 0);
+				doPerturb = haveGlobalBest && (k % 11 == 0);
+				doCrossover = !doPerturb && nElite >= 2 && (k % 5 == 1);
 				if (doPerturb)
 					copy_seed_set(localSeeds, globalBest, localLen, globalBestLen, nSeeds);
+				else if (doCrossover) {
+					for (int si = 0; si < nSeeds; ++si) {
+						int e = ale_rand() % nElite;
+						localLen[si] = eliteLen[e][si];
+						for (int j = 0; j <= localLen[si]; ++j)
+							localSeeds[si][j] = elite[e][si][j];
+					}
+				}
 			}
 
 			if (doPerturb)
 				perturb_from_best(localSeeds, localLen, nSeeds);
-			else
-				init_seeds_spread_cores(weight, localLen, localSeeds, nSeeds, k);
+			else if (!doCrossover) {
+				if (k % 2 == 0)
+					init_seeds_spread_cores(weight, localLen, localSeeds, nSeeds, k);
+				else
+					init_seeds_with_core(weight, localLen, localSeeds, nSeeds);
+			}
 
-			// OC often collapses complementary cores; skip it on most restarts
-			if (doPerturb || (k % 3 == 0))
+			// OC on most random inits; skip after crossover so mixed seeds stay intact
+			if (doPerturb || (!doCrossover && (k % 2 == 0)))
 				MULTIPLE_SWAP1_OVERLAPS_FAST(localSeeds, nSeeds);
 			if (!all_seeds_have_required_core_length(localSeeds, nSeeds) || !all_seeds_have_weight(localSeeds, nSeeds, weight)) {
 				for (int si = 0; si < nSeeds; ++si)
@@ -2039,6 +2131,10 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 						bestMode = curUsedEstimate;
 						copy_seed_set(globalBest, localSeeds, globalBestLen, localLen, nSeeds);
 						haveGlobalBest = true;
+						copy_seed_set(elite[elitePos], localSeeds, eliteLen[elitePos], localLen, nSeeds);
+						elitePos = (elitePos + 1) % ELITE_MAX;
+						if (nElite < ELITE_MAX)
+							nElite++;
 						t[1] = clock()/ 1000000.0;
 						cout << "\n --- random try number " << k << " --- " << endl;
 						cout << "seeds:" << endl;
@@ -2064,6 +2160,10 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 		if (batchImproved) {
 			bestSens = greedy_tail_ascent(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
 			bestSens = local_search_from_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
+			copy_seed_set(elite[elitePos], globalBest, eliteLen[elitePos], globalBestLen, nSeeds);
+			elitePos = (elitePos + 1) % ELITE_MAX;
+			if (nElite < ELITE_MAX)
+				nElite++;
 		}
 		else
 			badMove += (batchEnd - batchStart);
@@ -2090,10 +2190,37 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 	if (haveGlobalBest)
 		bestSens = polish_global_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0]);
 
+	// Optional post-processing: append each best seed's reverse and recompute.
+	if (haveGlobalBest && require_symmetry) {
+		int nSym = 0;
+		char** symSeeds = expand_with_reverses(globalBest, globalBestLen, nSeeds, &nSym);
+		bool usedEst = false;
+		bestSens = MultipleSensitivity(symSeeds, nSym, N, p, totalVirtualMem, &usedEst);
+		bestMode = usedEst;
+		cout << endl << " --- symmetry: doubled set (" << nSym << " shapes) --- " << endl;
+		cout << "seeds:" << endl;
+		printArray2(symSeeds, nSym);
+		if (!bestMode)
+			cout << "Real sensitivity = " << bestSens << endl;
+		else
+			cout << "Estimated sensitivity = " << bestSens << endl;
+		for (int i = 0; i < nSym; ++i)
+			delete[] symSeeds[i];
+		delete[] symSeeds;
+	}
+
 	for (i = 0; i < nSeeds; ++i)
 		delete[] globalBest[i];
 	delete[] globalBest;
 	delete[] globalBestLen;
+	for (int e = 0; e < ELITE_MAX; ++e) {
+		for (int si = 0; si < nSeeds; ++si)
+			delete[] elite[e][si];
+		delete[] elite[e];
+		delete[] eliteLen[e];
+	}
+	delete[] elite;
+	delete[] eliteLen;
 	cout << endl << "Best sensitivity is " << bestSens << endl;
 	cout<<endl;
 	cout << "Computed in " << t[1]-t[0] << " seconds" << endl << endl;
@@ -2186,13 +2313,14 @@ void verbose(){
 	
 	cerr << "Five / Six arguments required; different number given\n"
 		<< "command line should be:\n"
-		<< "./ALeS <weight> <numberOfSeeds> <similarity> <lengthOfHomologyRegion> <corelength> [<upperBound>]\n";
+		<< "./ALeS <weight> <numberOfSeeds> <similarity> <lengthOfHomologyRegion> <corelength> [<upperBound>] [<symmetryFlag>]\n";
 	cerr<<" <weight> : Number of match positions in each seed"<<endl;
 	cerr<<" <numberOfSeeds> : Number of seeds"<<endl;
 	cerr<<" <similarity> : Similarity level"<<endl;
 	cerr<<" <lengthOfHomologyRegion> : Length of homologous region"<<endl;
 	cerr<<" <corelength> : Minimum run length of consecutive 1s required in each shape"<<endl;
 	cerr<<" <upperBound> [optional] : Seed length upper bound"<<endl;
+	cerr<<" <symmetryFlag> [optional] : 1 to append each seed's reverse (k becomes 2k) and recompute sensitivity"<<endl;
 }
 
 // MAIN 
@@ -2201,7 +2329,7 @@ int main(int argc, char **argv)
 	double ttime[2] = {0, 0};
 	ttime[0] = clock()/ 1000000.0;
 	
-	if (argc < 6 || argc > 7) {
+	if (argc < 6 || argc > 8) {
 		verbose();
 		exit(1);
 	}
@@ -2215,6 +2343,7 @@ int main(int argc, char **argv)
 		upperBound = N;
 	else
 		upperBound = atoi(argv[6]);  // upper bound of seed lengths
+	require_symmetry = (argc == 8) ? (atoi(argv[7]) != 0) : false;
 	
 	l = new int[k];		// seeds' lengths array
 	
