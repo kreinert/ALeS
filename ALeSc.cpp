@@ -63,6 +63,119 @@ int original_M = 0;					// resets the M value in adaptive length algorithm
 bool isRegionCreated = false;		// makes sure homologous_array is created only once
 bool require_symmetry = false;		// if true, score and print each seed together with its reverse
 
+// One automaton node: 7 columns, same layout as the old BS[i][0..6].
+struct BSNode {
+	long long c[7];
+	long long& operator[](int j) { return c[j]; }
+};
+
+// Thread-local scratch: overlap-complexity matrices, DP arrays, restart seed strings.
+struct OcBuf {
+	int capSeeds;
+	int capLen;
+	int8_t* om;
+	int8_t* sigma;
+	int64_t* ocm;
+	int8_t* tempSigma;
+	int* length;
+	OcBuf(): capSeeds(0), capLen(0), om(NULL), sigma(NULL), ocm(NULL), tempSigma(NULL), length(NULL) {}
+	void ensure(int nSeeds, int maxLen) {
+		if (nSeeds <= capSeeds && maxLen <= capLen)
+			return;
+		int ns = capSeeds > nSeeds ? capSeeds : nSeeds;
+		int ml = capLen > maxLen ? capLen : maxLen;
+		delete[] om;
+		delete[] sigma;
+		delete[] ocm;
+		delete[] tempSigma;
+		delete[] length;
+		capSeeds = ns;
+		capLen = ml;
+		size_t n2 = (size_t)ns * (size_t)ns;
+		om = new int8_t[n2 * (size_t)ml * (size_t)ml];
+		sigma = new int8_t[n2 * (size_t)(2 * ml - 1)];
+		ocm = new int64_t[n2];
+		tempSigma = new int8_t[(size_t)(2 * ml)];
+		length = new int[(size_t)ns];
+	}
+};
+struct DpBuf {
+	size_t capBS;
+	size_t capF;
+	size_t capFrows;
+	int capSeed;
+	BSNode* BS;
+	double* fdata;
+	double** f;
+	long long* seed_length;
+	long long* INT_REV_SEEDS;
+	DpBuf(): capBS(0), capF(0), capFrows(0), capSeed(0), BS(NULL), fdata(NULL), f(NULL), seed_length(NULL), INT_REV_SEEDS(NULL) {}
+	void ensure_seeds(int nSeeds) {
+		if (nSeeds <= capSeed)
+			return;
+		delete[] seed_length;
+		delete[] INT_REV_SEEDS;
+		capSeed = nSeeds;
+		seed_length = new long long[(size_t)nSeeds];
+		INT_REV_SEEDS = new long long[(size_t)nSeeds];
+	}
+	void ensure_bs(size_t nBS) {
+		if (nBS <= capBS)
+			return;
+		delete[] BS;
+		capBS = nBS;
+		BS = new BSNode[nBS];
+	}
+	void ensure_f(size_t nF, size_t nRows) {
+		if (nF > capF) {
+			delete[] fdata;
+			capF = nF;
+			fdata = new double[nF];
+		}
+		if (nRows > capFrows) {
+			delete[] f;
+			capFrows = nRows;
+			f = new double*[nRows];
+		}
+	}
+};
+struct SeedBuf {
+	int cap;
+	char** ptrs;
+	char* chars;
+	int* lens;
+	SeedBuf(): cap(0), ptrs(NULL), chars(NULL), lens(NULL) {}
+	void ensure(int n) {
+		if (n <= cap)
+			return;
+		delete[] ptrs;
+		delete[] chars;
+		delete[] lens;
+		cap = n;
+		ptrs = new char*[(size_t)n];
+		chars = new char[(size_t)n * 100];
+		lens = new int[(size_t)n];
+		for (int i = 0; i < n; ++i)
+			ptrs[i] = chars + (size_t)i * 100;
+	}
+};
+static thread_local OcBuf tls_oc;
+static thread_local DpBuf tls_dp;
+static thread_local SeedBuf tls_restart;
+
+static inline int8_t& oc_om(int8_t* om, int nSeeds, int maxLen, int a, int b, int r, int c)
+{
+	return om[(((size_t)a * (size_t)nSeeds + (size_t)b) * (size_t)maxLen + (size_t)r) * (size_t)maxLen + (size_t)c];
+}
+static inline int8_t* oc_sigma(int8_t* sigma, int nSeeds, int maxSigma, int a, int b)
+{
+	return sigma + ((size_t)a * (size_t)nSeeds + (size_t)b) * (size_t)maxSigma;
+}
+static inline int64_t& oc_ocm(int64_t* ocm, int nSeeds, int a, int b)
+{
+	return ocm[(size_t)a * (size_t)nSeeds + (size_t)b];
+}
+
 int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS);
 double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate = NULL, bool skipSymmetryExpand = false);
 char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, double curSens, int trial, double* outBestSens = NULL, bool* outUsedEstimate = NULL);
@@ -359,80 +472,80 @@ void print_seed_set(char** seeds, int nSeeds)
 
 // updates OM[k][cur_seed] (or [cur_seed][k]) due to swapping 1 with 0 in positions i(1) and j(0) in cur_seed
 // swapping already performed !!!
-void UPDATE_OM (int8_t**** OM, int* length, int k, int cur_seed, int i, int j) 
+void UPDATE_OM(int8_t* om, int nSeeds, int maxLen, int* length, int k, int cur_seed, int i, int j)
 {
 	int cur_seed_length = length[cur_seed], k_seed_length = length[k], l = 0;
 	if (k < cur_seed) {
 		for (l=0; l<k_seed_length; ++l)	{
-			if (OM[k][cur_seed][l][i] == 1)	OM[k][cur_seed][l][i] = -1;
-			else							OM[k][cur_seed][l][i] =  0;
-			if (OM[k][cur_seed][l][j] == -1)OM[k][cur_seed][l][j] =  1;
-			else							OM[k][cur_seed][l][j] = -1;
-		}							
+			int8_t& a = oc_om(om, nSeeds, maxLen, k, cur_seed, l, i);
+			if (a == 1) a = -1; else a = 0;
+			int8_t& b = oc_om(om, nSeeds, maxLen, k, cur_seed, l, j);
+			if (b == -1) b = 1; else b = -1;
+		}
 	}
-	if (k > cur_seed) {							
+	if (k > cur_seed) {
 		for (l=0; l<k_seed_length; ++l)	{
-			if (OM[cur_seed][k][i][l] == 1) OM[cur_seed][k][i][l] = -1;
-			else							OM[cur_seed][k][i][l] =  0;
-			if (OM[cur_seed][k][j][l] == -1)OM[cur_seed][k][j][l] =  1;
-			else 							OM[cur_seed][k][j][l] = -1;
-		}							
+			int8_t& a = oc_om(om, nSeeds, maxLen, cur_seed, k, i, l);
+			if (a == 1) a = -1; else a = 0;
+			int8_t& b = oc_om(om, nSeeds, maxLen, cur_seed, k, j, l);
+			if (b == -1) b = 1; else b = -1;
+		}
 	}
-	if (k == cur_seed) {							
-		for (l=0; l<cur_seed_length; ++l)	
+	if (k == cur_seed) {
+		for (l=0; l<cur_seed_length; ++l)
 			if ((l!=i) && (l!=j)) {
-				if (OM[cur_seed][cur_seed][l][i] == 1)  OM[cur_seed][cur_seed][l][i] = -1;
-				else									OM[cur_seed][cur_seed][l][i] =  0;
-				if (OM[cur_seed][cur_seed][l][j] == -1) OM[cur_seed][cur_seed][l][j] =  1;
-				else									OM[cur_seed][cur_seed][l][j] = -1;
-			}				
-		for (l=0; l<cur_seed_length; ++l)	
-			if ((l!=i) && (l!=j)) {
-				if (OM[cur_seed][cur_seed][i][l] == 1)  OM[cur_seed][cur_seed][i][l] = -1;
-				else									OM[cur_seed][cur_seed][i][l] =  0;
-				if (OM[cur_seed][cur_seed][j][l] == -1) OM[cur_seed][cur_seed][j][l] =  1;
-				else									OM[cur_seed][cur_seed][j][l] = -1;
+				int8_t& a = oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, l, i);
+				if (a == 1) a = -1; else a = 0;
+				int8_t& b = oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, l, j);
+				if (b == -1) b = 1; else b = -1;
 			}
-		OM[cur_seed][cur_seed][i][i] = 0;
-		OM[cur_seed][cur_seed][j][j] = 1;
+		for (l=0; l<cur_seed_length; ++l)
+			if ((l!=i) && (l!=j)) {
+				int8_t& a = oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, i, l);
+				if (a == 1) a = -1; else a = 0;
+				int8_t& b = oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, j, l);
+				if (b == -1) b = 1; else b = -1;
+			}
+		oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, i, i) = 0;
+		oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, j, j) = 1;
 	}
 }
 
 // updates sigma[k][cur_seed] (or [cur_seed][k]) due to swapping 1 with 0 in positions i(1) and j(0) in cur_seed
 // swapping is not performed !!!
-void UPDATE_SIGMA (int8_t**** OM, int8_t* tempSigma, int* length, int k, int cur_seed, int i, int j) 
+void UPDATE_SIGMA(int8_t* om, int nSeeds, int maxLen, int8_t* tempSigma, int* length, int k, int cur_seed, int i, int j)
 {
 	int cur_seed_length = length[cur_seed], k_seed_length = length[k], l = 0;
 	if (k < cur_seed) {
 		for (l=0; l<k_seed_length; ++l)	{
-			if (OM[k][cur_seed][l][i] == 1)
+			if (oc_om(om, nSeeds, maxLen, k, cur_seed, l, i) == 1)
 				--tempSigma[cur_seed_length-1+l-i];
-			if (OM[k][cur_seed][l][j] == -1)
-				++tempSigma[cur_seed_length-1+l-j];										
-		}							
+			if (oc_om(om, nSeeds, maxLen, k, cur_seed, l, j) == -1)
+				++tempSigma[cur_seed_length-1+l-j];
+		}
 	}
-	if (k > cur_seed) {							
+	if (k > cur_seed) {
 		for (l=0; l<k_seed_length; ++l)	{
-			if (OM[cur_seed][k][i][l] == 1)
+			if (oc_om(om, nSeeds, maxLen, cur_seed, k, i, l) == 1)
 				--tempSigma[k_seed_length-1+i-l];
-			if (OM[cur_seed][k][j][l] == -1)
-				++tempSigma[k_seed_length-1+j-l];										
-		}							
+			if (oc_om(om, nSeeds, maxLen, cur_seed, k, j, l) == -1)
+				++tempSigma[k_seed_length-1+j-l];
+		}
 	}
-	if (k == cur_seed) {							
-		for (l=0; l<cur_seed_length; ++l)	
+	if (k == cur_seed) {
+		for (l=0; l<cur_seed_length; ++l)
 			if ((l!=i) && (l!=j)) {
-				if (OM[cur_seed][cur_seed][l][i] == 1) 
+				if (oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, l, i) == 1)
 					--tempSigma[cur_seed_length-1+l-i];
-				if (OM[cur_seed][cur_seed][l][j] == -1) 
-					++tempSigma[cur_seed_length-1+l-j];	
-			}				
-		for (l=0; l<cur_seed_length; ++l)	
+				if (oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, l, j) == -1)
+					++tempSigma[cur_seed_length-1+l-j];
+			}
+		for (l=0; l<cur_seed_length; ++l)
 			if ((l!=i) && (l!=j)) {
-				if (OM[cur_seed][cur_seed][i][l] == 1) 
-					--tempSigma[cur_seed_length-1+i-l]; 
-				if (OM[cur_seed][cur_seed][j][l] == -1) 
-					++tempSigma[cur_seed_length-1+j-l]; 
+				if (oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, i, l) == 1)
+					--tempSigma[cur_seed_length-1+i-l];
+				if (oc_om(om, nSeeds, maxLen, cur_seed, cur_seed, j, l) == -1)
+					++tempSigma[cur_seed_length-1+j-l];
 			}
 	}
 }
@@ -521,21 +634,32 @@ static inline void reverse_copy_seed(const char* src, char* dst, int len)
 }
 
 // Build a 2k set: the original seeds followed by each seed reversed.
+// Thread-local scratch — valid until the next expand on this thread. Do not free.
 char** expand_with_reverses(char** seeds, int* lens, int nSeeds, int* outCount)
 {
 	int n = nSeeds * 2;
-	char** out = new char* [n];
+	static thread_local int cap = 0;
+	static thread_local char** ptrs = NULL;
+	static thread_local char* chars = NULL;
+
+	if (cap < n) {
+		delete[] ptrs;
+		delete[] chars;
+		cap = n;
+		ptrs = new char*[cap];
+		chars = new char[(size_t)cap * 100];
+		for (int i = 0; i < cap; ++i)
+			ptrs[i] = chars + (size_t)i * 100;
+	}
 	for (int i = 0; i < nSeeds; ++i) {
 		int len = lens ? lens[i] : (int)strlen(seeds[i]);
-		out[i] = new char[100];
-		out[nSeeds + i] = new char[100];
 		for (int j = 0; j <= len; ++j)
-			out[i][j] = seeds[i][j];
-		reverse_copy_seed(seeds[i], out[nSeeds + i], len);
+			ptrs[i][j] = seeds[i][j];
+		reverse_copy_seed(seeds[i], ptrs[nSeeds + i], len);
 	}
 	if (outCount)
 		*outCount = n;
-	return out;
+	return ptrs;
 }
 
 void copy_seed_set(char** dst, char** src, int* dstLen, int* srcLen, int nSeeds)
@@ -1093,57 +1217,57 @@ void init_seeds_spread_cores(int weight, int* length, char** seeds, int nSeeds, 
 }
 
 // swaps (fast) 1-* to improve overlaps of "seeds"
-int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)                
+int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 {   // until no longer possible; returns the overlaps obtained
 	int64_t bestOC = 0, curOC = 0, oldOC = 0, k_cur_seed_OC = 0, k_best_seed_OC = 0;
-	int found_swap=0, cur_seed=0, cur_seed_length = 0, best_i=0, best_j=0, 
+	int found_swap=0, cur_seed=0, cur_seed_length = 0, best_i=0, best_j=0,
 	best_seed=0, k=0, no_swaps=0, i = 0, j = 0, l = 0, tmp = 0;
-	// compute weight
-	j = strlen(SEEDS[0]);
+	j = (int)strlen(SEEDS[0]);
 	int weight = 0;	for (i=0; i<j; i++) if (SEEDS[0][i] == '1') ++weight;
-	// compute lengths
-	int* length = new int [NO_SEEDS];
-	for (i=0; i<NO_SEEDS; i++) 
-		length[i] = strlen(SEEDS[i]);
-	// create overlap matrices (OM), sigma arrays (sigma), OC matrix (OCM): 
-	// OM[i][j], 0<=i<=j<=NO_SEEDS, is a length[i]xlength[j] matrix for overlaps between SEEDS[i] and SEEDS[j]
-	// OM[.][.][k][l] =  1 for (1,1), 0 for (0,0), and -1 for (1,0) or (0,1)
-	// sigma[i][j] contains the number of overlaps between SEEDS[i] and SEEDS[j] in all possible shifts
-	// each overlaps comes from a NW-SE diagonal in OM[i][j]
-	int8_t**** OM = new int8_t*** [NO_SEEDS];
-	int8_t*** sigma = new int8_t** [NO_SEEDS];
-	int64_t** OCM = new int64_t* [NO_SEEDS];
-	int8_t* tempSigma = new int8_t [1000]; // will temporarily store each sigma[i][j] to process it
-	int tempSigmaLength = 1000;
+	int maxLen = 0;
+	for (i=0; i<NO_SEEDS; i++) {
+		int li = (int)strlen(SEEDS[i]);
+		if (li > maxLen)
+			maxLen = li;
+	}
+	tls_oc.ensure(NO_SEEDS, maxLen);
+	const int strideS = tls_oc.capSeeds;
+	const int strideL = tls_oc.capLen;
+	const int maxSigma = 2 * strideL - 1;
+	int* length = tls_oc.length;
+	int8_t* om = tls_oc.om;
+	int8_t* sigma = tls_oc.sigma;
+	int64_t* ocm = tls_oc.ocm;
+	int8_t* tempSigma = tls_oc.tempSigma;
+	for (i=0; i<NO_SEEDS; i++)
+		length[i] = (int)strlen(SEEDS[i]);
+	memset(om, 0, (size_t)strideS * (size_t)strideS * (size_t)strideL * (size_t)strideL);
+	memset(sigma, 0, (size_t)strideS * (size_t)strideS * (size_t)maxSigma);
+	memset(ocm, 0, (size_t)strideS * (size_t)strideS * sizeof(int64_t));
 	for (i=0; i<NO_SEEDS; ++i) {
-		OM[i] = new int8_t** [NO_SEEDS];
-		OCM[i] = new int64_t [NO_SEEDS];
-		sigma[i] = new int8_t* [NO_SEEDS];
 		for (j=i; j<NO_SEEDS; ++j) {
-			OCM[i][j] = 0;
-			OM[i][j] = new int8_t* [length[i]];
-			sigma[i][j] = new int8_t [length[i]+length[j]-1];
-			for (k=0; k<length[i]+length[j]-1; ++k)
-				sigma[i][j][k] = 0;
+			int8_t* sig = oc_sigma(sigma, strideS, maxSigma, i, j);
 			for (k=0; k<length[i]; ++k) {
-				OM[i][j][k] = new int8_t [length[j]];
-				for (l=0; l<length[j]; ++l) 
+				for (l=0; l<length[j]; ++l) {
+					int8_t v;
 					if ((SEEDS[i][k] == '1') && (SEEDS[j][l] == '1')) {
-						OM[i][j][k][l] = 1;
-						++sigma[i][j][length[j]-1+k-l];
+						v = 1;
+						++sig[length[j]-1+k-l];
 					}
+					else if ((SEEDS[i][k] != '1') && (SEEDS[j][l] != '1'))
+						v = 0;
 					else
-						if ((SEEDS[i][k] != '1') && (SEEDS[j][l] != '1'))
-							OM[i][j][k][l] = 0;
-						else
-							OM[i][j][k][l] = -1;
+						v = -1;
+					oc_om(om, strideS, strideL, i, j, k, l) = v;
+				}
 			}
+			int64_t pairOC = 0;
 			for (k=0; k<length[i]+length[j]-1; ++k)
-				OCM[i][j] += (1 << (int)sigma[i][j][k]);
-			curOC += OCM[i][j];
+				pairOC += (1 << (int)sig[k]);
+			oc_ocm(ocm, strideS, i, j) = pairOC;
+			curOC += pairOC;
 		}
 	}
-	// swap until no longer improving OC
 	bestOC = curOC;
 	do{
 		found_swap = 0;
@@ -1161,20 +1285,19 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 						}
 						SEEDS[cur_seed][i] = '1';
 						SEEDS[cur_seed][j] = '0';
-						// compute the OC after swapping positions i(1) and j(0) (without flipping)
 						oldOC = curOC;
 						for (k=0; k<NO_SEEDS; ++k) {
-							// copy sigma[k][cur_seed] into tempSigma
-							tempSigmaLength = length[k]+cur_seed_length-1;
+							int a = (k < cur_seed) ? k : cur_seed;
+							int b = (k > cur_seed) ? k : cur_seed;
+							int tempSigmaLength = length[k]+cur_seed_length-1;
+							int8_t* src = oc_sigma(sigma, strideS, maxSigma, a, b);
 							for (l=0; l<tempSigmaLength; ++l)
-								tempSigma[l] = (k<cur_seed) ? sigma[k][cur_seed][l] : sigma[cur_seed][k][l];
-							// update tempSigma to reflect swapping positions i(1) and j(0)
-							UPDATE_SIGMA (OM, tempSigma, length, k, cur_seed, i, j);
-							// compute the change in OC; the new sigma is in tempSigma
+								tempSigma[l] = src[l];
+							UPDATE_SIGMA(om, strideS, strideL, tempSigma, length, k, cur_seed, i, j);
 							k_cur_seed_OC = 0;
 							for (l=0; l<tempSigmaLength; ++l)
 								k_cur_seed_OC += (1 << (int)tempSigma[l]);
-							curOC -= (k<cur_seed) ? OCM[k][cur_seed] : OCM[cur_seed][k];
+							curOC -= oc_ocm(ocm, strideS, a, b);
 							curOC += k_cur_seed_OC;
 						}
 						if (curOC < bestOC) {
@@ -1184,40 +1307,37 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 							bestOC = curOC;
 							found_swap = 1;
 						}
-						// restore curOC
 						curOC = oldOC;
 					}
 		}
 		if (found_swap == 1) {
 			no_swaps++;
-			if (no_swaps >= weight * NO_SEEDS)   // no more than wk swaps are performed
-				found_swap = 0; 
-			// update sigmas
+			if (no_swaps >= weight * NO_SEEDS)
+				found_swap = 0;
 			for (k=0; k<NO_SEEDS; ++k) {
-				i = (k < best_seed) ? k : best_seed;
-				j = (k > best_seed) ? k : best_seed;
-				UPDATE_SIGMA(OM, sigma[i][j], length, k, best_seed, best_i, best_j);
+				int a = (k < best_seed) ? k : best_seed;
+				int b = (k > best_seed) ? k : best_seed;
+				UPDATE_SIGMA(om, strideS, strideL, oc_sigma(sigma, strideS, maxSigma, a, b),
+					length, k, best_seed, best_i, best_j);
 			}
-			// change seeds
-			SEEDS[best_seed][best_i] = '0';	
-			SEEDS[best_seed][best_j] = '1';	
-			// update overlap matrix OM
-			for (k=0; k<NO_SEEDS; ++k) 
-				UPDATE_OM(OM, length, k, best_seed, best_i, best_j);
-			// update OC matrix (OCM)
+			SEEDS[best_seed][best_i] = '0';
+			SEEDS[best_seed][best_j] = '1';
+			for (k=0; k<NO_SEEDS; ++k)
+				UPDATE_OM(om, strideS, strideL, length, k, best_seed, best_i, best_j);
 			for (k=0; k<NO_SEEDS; ++k) {
+				int a = (k < best_seed) ? k : best_seed;
+				int b = (k > best_seed) ? k : best_seed;
 				k_best_seed_OC = 0;
+				int8_t* sig = oc_sigma(sigma, strideS, maxSigma, a, b);
 				for (l=0; l<length[k]+length[best_seed]-1; ++l) {
-					tmp = (k < best_seed) ? (int)sigma[k][best_seed][l] : (int)sigma[best_seed][k][l];
+					tmp = (int)sig[l];
 					k_best_seed_OC += (1 << tmp);
 				}
-				i = (k < best_seed) ? k : best_seed;
-				j = (k > best_seed) ? k : best_seed;
-				OCM[i][j] = k_best_seed_OC;
-			}			
+				oc_ocm(ocm, strideS, a, b) = k_best_seed_OC;
+			}
 			oldOC = curOC = bestOC;
 		}
-	} while(found_swap == 1);	
+	} while(found_swap == 1);
 	return(bestOC);
 }
 
@@ -1409,11 +1529,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 	if (require_symmetry && !skipSymmetryExpand) {
 		int nSym = 0;
 		char** sym = expand_with_reverses(SEEDS, NULL, NO_SEEDS, &nSym);
-		double s = MultipleSensitivity(sym, nSym, N, P, totalVirtualMem, outUsedEstimate, true);
-		for (int i = 0; i < nSym; ++i)
-			delete[] sym[i];
-		delete[] sym;
-		return s;
+		return MultipleSensitivity(sym, nSym, N, P, totalVirtualMem, outUsedEstimate, true);
 	}
 	bool usedEstimate = false;
 	if (outUsedEstimate)
@@ -1424,16 +1540,16 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 	hit=0, suffix_link=0, zero_link=0, new_i=0, tmp=0;
 	long long b_zero=0, b_one=0, MAX_NO_BS;
 	double f0=0, f1=0, result = 0;
-	long long **BS;
-	
-	// compute the lengths of the seeds and MAX_L = the length of the longest seed
-	long long* seed_length = new long long [NO_SEEDS];
+	BSNode *BS = NULL;
+	double *fdata = NULL;
+	double **f = NULL;
+	tls_dp.ensure_seeds(NO_SEEDS);
+	long long* seed_length = tls_dp.seed_length;
+	long long* INT_REV_SEEDS = tls_dp.INT_REV_SEEDS;
 	for (i=0; i<=NO_SEEDS-1; i++) {
 		seed_length[i] = strlen(SEEDS[i]);
 		if (MAX_L < seed_length[i]) MAX_L = seed_length[i];
 	}
-	// compute the integer values of the reversed seeds INTeger REVersed SEEDS
-	long long* INT_REV_SEEDS = new long long[NO_SEEDS];
 	for (i=0; i<=NO_SEEDS-1; i++)
 		INT_REV_SEEDS[i] = BinReversedToInt(SEEDS[i]); // !!! this works like * = 0
 	// create the tree of BS --- 1..NO_BS-1 *********************************************************
@@ -1449,7 +1565,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 		MAX_NO_BS = NO_SEEDS;
 		for (i=0; i<=NO_SEEDS-1; i++) {		// compute maximum possible no of b's
 			tmp = 1;
-			for (j=strlen(SEEDS[i])-1; j>=0; j--) {
+			for (j=seed_length[i]-1; j>=0; j--) {
 				if (SEEDS[i][j] != '1') tmp *= 2;
 				MAX_NO_BS += tmp;        // add previous value if 1 in seed or double (tmp *= 2 above) if a * in seed
 			}
@@ -1462,15 +1578,12 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 		
 		if(((totalRam * 0.9) < arraySize) || ((totalRam * 0.9) < (arraySize * floor(totalRam)))){		// try to filter using less expensive operations
 			makeHomologousRegion(P, N);
-			MAX_NO_BS = NO_BS = 0;
-			delete[] seed_length; delete[] INT_REV_SEEDS;
 			return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate);
 		}
-		// bound for computing sensitivity (not allocate more than 120GB)
-		BS = new long long *[NO_BS];
-		for (i=0; i<=NO_BS-1; i++)	{
-			BS[i] = new long long [7];
-			BS[i][0] = BS[i][3] = BS[i][4] = BS[i][5] = BS[i][6] = 0; // initialize
+		tls_dp.ensure_bs((size_t)MAX_NO_BS);
+		BS = tls_dp.BS;
+		for (i=0; i<=MAX_NO_BS-1; i++)	{
+			BS[i][0] = BS[i][3] = BS[i][4] = BS[i][5] = BS[i][6] = 0;
 			BS[i][1] = BS[i][2] = -1;
 		}
 		// create the tree by levels: all b's of length i are on level i
@@ -1543,6 +1656,8 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 			prev_level_start = prev_level_end+1;
 			prev_level_end = pos - 1;
 		}
+		// live automaton size — DP unused MAX_NO_BS slots is wasted work
+		NO_BS = pos;
 		// zero_links -- longest suffix of b0 in the tree
 		for (i=1; i<=NO_BS-1; i++)
 			if (BS[i][1] != -1)		// has left son, that is, 0-son
@@ -1556,12 +1671,12 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 					BS[i][6] = BS[zero_link][1];
 			}
 		// compute the f's  f[i][j] = probab to hit a prefix of length i that ends with INT_TO_BIN_REVERSED[BS[j][0]]
-		double **f;
-		f = new double* [N+1];
-		for (i=0; i<=N; i++) {
-			f[i] = new double [NO_BS];
-			for (j=0; j<=NO_BS-1; j++) f[i][j] = 0; // initialize
-		}
+		tls_dp.ensure_f((size_t)(N + 1) * (size_t)NO_BS, (size_t)N + 1);
+		fdata = tls_dp.fdata;
+		f = tls_dp.f;
+		memset(fdata, 0, sizeof(double) * (size_t)(N + 1) * (size_t)NO_BS);
+		for (i=0; i<=N; i++)
+			f[i] = fdata + i * NO_BS;
 		for (i=0; i<=N; i++) {
 			for (j=NO_BS-1; j>=0; j--) {
 				if (i==0) f[i][j] = 0;					// empty prefix of random region cannot be hit
@@ -1580,19 +1695,8 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 			}
 		}
 		result = f[N][0];
-		// free memory
-		delete[] seed_length; delete[] INT_REV_SEEDS;
-		for (i=0; i<=N; i++)
-			delete[] f[i];
-		delete[] f;
-		for (i=0; i<=MAX_NO_BS-1; i++)
-			delete[] BS[i];
-		delete[] BS;
 	}
-	// to handle segmentation fault
 	catch(std::bad_alloc){
-		MAX_NO_BS = 0;
-		delete[] seed_length; delete[] INT_REV_SEEDS;
 		return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate);
 	}
 	if (!outUsedEstimate)
@@ -2087,10 +2191,9 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 				#endif
 			);
 
-			char** localSeeds = new char* [nSeeds];
-			int* localLen = new int [nSeeds];
-			for (int si = 0; si < nSeeds; ++si)
-				localSeeds[si] = new char[100];
+			tls_restart.ensure(nSeeds);
+			char** localSeeds = tls_restart.ptrs;
+			int* localLen = tls_restart.lens;
 
 			pick_restart_lengths(localLen, nSeeds, weight, k);
 
@@ -2127,19 +2230,15 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 			if (doPerturb || (!doCrossover && (k % 2 == 0)))
 				MULTIPLE_SWAP1_OVERLAPS_FAST(localSeeds, nSeeds);
 			if (!all_seeds_have_required_core_length(localSeeds, nSeeds) || !all_seeds_have_weight(localSeeds, nSeeds, weight)) {
-				for (int si = 0; si < nSeeds; ++si)
-					delete[] localSeeds[si];
-				delete[] localSeeds;
-				delete[] localLen;
 				continue;
 			}
 
 			bool curUsedEstimate = false;
 			double curSens = MultipleSensitivity(localSeeds, nSeeds, N, p, totalVirtualMem, &curUsedEstimate);
 			if (curSens != -1) {
-				int minLen = (int)strlen(localSeeds[0]), maxLen = (int)strlen(localSeeds[0]);
+				int minLen = localLen[0], maxLen = localLen[0];
 				for (int si = 0; si < nSeeds; si++) {
-					int seedLen = (int)strlen(localSeeds[si]);
+					int seedLen = localLen[si];
 					if (seedLen < minLen)
 						minLen = seedLen;
 					if (seedLen > maxLen)
@@ -2180,11 +2279,6 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 					}
 				}
 			}
-
-			for (int si = 0; si < nSeeds; ++si)
-				delete[] localSeeds[si];
-			delete[] localSeeds;
-			delete[] localLen;
 		}
 
 		if (batchImproved) {
