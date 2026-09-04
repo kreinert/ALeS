@@ -61,11 +61,12 @@ double optimized_best = 0.0;		// holds the best sensitivity obtained in the func
 int original_m = 0;					// resets the m value in adaptive length algorithm
 int original_M = 0;					// resets the M value in adaptive length algorithm
 bool isRegionCreated = false;		// makes sure homologous_array is created only once
-bool require_symmetry = false;		// if true, append each best seed's reverse and recompute sensitivity
+bool require_symmetry = false;		// if true, score and print each seed together with its reverse
 
 int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS);
-double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate = NULL);
+double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate = NULL, bool skipSymmetryExpand = false);
 char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, double curSens, int trial, double* outBestSens = NULL, bool* outUsedEstimate = NULL);
+static inline void reverse_copy_seed(const char* src, char* dst, int len);
 
 /*
  * Precomputed arrays:
@@ -334,6 +335,26 @@ void printArray2(char** array,int length)
 		cout<<array[i]<<endl;
 	}
 	cout<<endl;
+}
+
+// Print designed seeds; if symmetry is on, also print each reverse.
+void print_seed_set(char** seeds, int nSeeds)
+{
+	if (!require_symmetry) {
+		printArray2(seeds, nSeeds);
+		return;
+	}
+	cout << "designed:" << endl;
+	for (int i = 0; i < nSeeds; ++i)
+		cout << seeds[i] << endl;
+	cout << "reversed:" << endl;
+	for (int i = 0; i < nSeeds; ++i) {
+		int len = (int)strlen(seeds[i]);
+		char rev[100];
+		reverse_copy_seed(seeds[i], rev, len);
+		cout << rev << endl;
+	}
+	cout << endl;
 }
 
 // updates OM[k][cur_seed] (or [cur_seed][k]) due to swapping 1 with 0 in positions i(1) and j(0) in cur_seed
@@ -862,7 +883,7 @@ double greedy_tail_ascent(char** globalBest, int* globalBestLen, int nSeeds, int
 						double elapsed = clock()/ 1000000.0 - t0;
 						cout << "\n --- greedy tail (from try " << parentTry << ") --- " << endl;
 						cout << "seeds:" << endl;
-						printArray2(globalBest, nSeeds);
+						print_seed_set(globalBest, nSeeds);
 						cout << "Real sensitivity = " << bestSens << endl;
 						cout <<"time (since beginning): "<< elapsed << endl << flush;
 					}
@@ -954,7 +975,7 @@ double local_search_from_best(char** globalBest, int* globalBestLen, int nSeeds,
 				double elapsed = clock()/ 1000000.0 - t0;
 				cout << "\n --- local search step " << step << " (from try " << parentTry << ") --- " << endl;
 				cout << "seeds:" << endl;
-				printArray2(globalBest, nSeeds);
+				print_seed_set(globalBest, nSeeds);
 				if(!bestMode)
 					cout << "Real sensitivity = " << bestSens << endl;
 				else{
@@ -1383,8 +1404,17 @@ inline long long BinReversedToInt (char *s)
 }
 
 // Computing sensitivity of a set of SEEDS with the given parameters using the dynamic programming of (Li et al., 2004)
-double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate)
+double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate, bool skipSymmetryExpand)
 {
+	if (require_symmetry && !skipSymmetryExpand) {
+		int nSym = 0;
+		char** sym = expand_with_reverses(SEEDS, NULL, NO_SEEDS, &nSym);
+		double s = MultipleSensitivity(sym, nSym, N, P, totalVirtualMem, outUsedEstimate, true);
+		for (int i = 0; i < nSym; ++i)
+			delete[] sym[i];
+		delete[] sym;
+		return s;
+	}
 	bool usedEstimate = false;
 	if (outUsedEstimate)
 		*outUsedEstimate = false;
@@ -2138,7 +2168,7 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 						t[1] = clock()/ 1000000.0;
 						cout << "\n --- random try number " << k << " --- " << endl;
 						cout << "seeds:" << endl;
-						printArray2(globalBest, nSeeds);
+						print_seed_set(globalBest, nSeeds);
 						if(!bestMode)
 							cout << "Real sensitivity = " << bestSens << endl;
 						else{
@@ -2190,23 +2220,9 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 	if (haveGlobalBest)
 		bestSens = polish_global_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0]);
 
-	// Optional post-processing: append each best seed's reverse and recompute.
 	if (haveGlobalBest && require_symmetry) {
-		int nSym = 0;
-		char** symSeeds = expand_with_reverses(globalBest, globalBestLen, nSeeds, &nSym);
-		bool usedEst = false;
-		bestSens = MultipleSensitivity(symSeeds, nSym, N, p, totalVirtualMem, &usedEst);
-		bestMode = usedEst;
-		cout << endl << " --- symmetry: doubled set (" << nSym << " shapes) --- " << endl;
-		cout << "seeds:" << endl;
-		printArray2(symSeeds, nSym);
-		if (!bestMode)
-			cout << "Real sensitivity = " << bestSens << endl;
-		else
-			cout << "Estimated sensitivity = " << bestSens << endl;
-		for (int i = 0; i < nSym; ++i)
-			delete[] symSeeds[i];
-		delete[] symSeeds;
+		cout << endl << " --- designed seeds and their reverses --- " << endl;
+		print_seed_set(globalBest, nSeeds);
 	}
 
 	for (i = 0; i < nSeeds; ++i)
@@ -2285,7 +2301,7 @@ void ALeS(char** S){
 		MULTIPLE_SWAP1_OVERLAPS_FAST(S, k);
 		t[1] = clock()/ 1000000.0;
 		cout << "ALeS initial seed set is: "<<endl<<endl;
-		printArray2(S,k);
+		print_seed_set(S,k);
 		cout << "Computed in "<<t[1]-t[0]<< " seconds" << endl;
 		cout<< endl;
 		double sensitivity = 0.0;
@@ -2320,7 +2336,7 @@ void verbose(){
 	cerr<<" <lengthOfHomologyRegion> : Length of homologous region"<<endl;
 	cerr<<" <corelength> : Minimum run length of consecutive 1s required in each shape"<<endl;
 	cerr<<" <upperBound> [optional] : Seed length upper bound"<<endl;
-	cerr<<" <symmetryFlag> [optional] : 1 to append each seed's reverse (k becomes 2k) and recompute sensitivity"<<endl;
+	cerr<<" <symmetryFlag> [optional] : 1 to score each iteration on the designed seeds plus their reverses"<<endl;
 }
 
 // MAIN 
