@@ -17,8 +17,14 @@ ALeS will benefit numerous software programs in a variety of areas, including tr
 
 **Installation:**
 
-g++ compiler is required to run ALeS.  
-Download all files from the repository, navigate to ALeS directory and compile ALeS.cpp using the **make** command.
+A C++ compiler is required. Download the repository, enter the ALeS directory, and build with **make**:
+
+```
+make ALeS    # original adaptive-length designer (ALeS.cpp)
+make ALeSc   # core-constrained designer (ALeSc.cpp; OpenMP if available)
+```
+
+On macOS, `make ALeSc` uses Homebrew `libomp` when it is installed (`brew install libomp`). Set `OMP_NUM_THREADS` to control the number of restart threads.
 
 **How to run ALeS:**
 
@@ -58,6 +64,37 @@ For the command shown above, a sample ALeS output would be:
 110110000100001000101011  
 Real sensitivity = 0.90968
 ```
+
+**ALeSc (required *m*-core):**
+
+`ALeSc` is the same sensitivity-based designer with one extra constraint: every shape must contain at least `corelength` consecutive match positions (`1`s). That *m*-core is kept during search. Seed weight, optional length upper bound, and the Li et al. multiple-seed sensitivity DP are unchanged.
+
+```
+./ALeSc <weight> <numberOfSeeds> <similarity> <region_length> <corelength> [<upperBound>] [<symmetryFlag>] [frozenSeeds...]
+```
+
+Example (weight 31, two seeds, similarity 0.90, homology length 100, core 19, length at most 39, score each seed with its reverse):
+
+```
+./ALeSc 31 2 0.90 100 19 39 1
+```
+
+```
+<weight>            : Number of match positions in each seed
+<numberOfSeeds>     : Number of designed seeds (k)
+<similarity>        : Similarity level
+<region_length>     : Length of homologous region
+<corelength>        : Minimum run of consecutive 1s in every shape
+<upperBound>        : Optional; maximum seed length (must be < region_length and >= weight)
+<symmetryFlag>      : Optional; 1 to score and print each designed seed together with its reverse
+[frozenSeeds...]    : Optional 01-strings; freeze these k-1 seeds (cores stay put) and search for the rest
+```
+
+When `k > 1` and no frozen seeds are given, ALeSc grows the set from 1 to *k*: it freezes the best *k*−1 cores, searches for the new seed, and still allows flank `1`/`0` moves on the older seeds. A final polish unfreezes all seeds.
+
+If `<symmetryFlag>` is `1` (reverse-doubling), every sensitivity evaluation uses the *k* designed seeds plus their reverses (2*k* shapes in the DP). Overlap-complexity uses that same doubled set. Designing *k* seeds this way matches designing 2*k* seeds without doubling on the grids we ran (`w=31`, `p=0.90`, `N=100`, length bound 39).
+
+After an improving batch, ALeSc tries small core slides (the extra `1`s stay put when they remain outside the new core) and a greedy climb of the flanks.
 
 **Cite:**
 

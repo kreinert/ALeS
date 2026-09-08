@@ -54,6 +54,7 @@ const int FIND_OPTIMAL_POLISH = 200;	//findOptimal trials in final polish
 const double LOCAL_WALK_MARGIN = 0.0015;	//Accept near-best local moves and continue from them
 const int PARALLEL_BATCH = 20;		//Restart batch size for OpenMP parallel search
 const int ELITE_MAX = 16;			//Pool of improving sets for seed-wise crossover
+const int CORE_SLIDE_MAX = 2;		//Try core shifts of ±1..±CORE_SLIDE_MAX, keeping flanks
 bool mode;							// mode decides if sensitivity (0) or estimated sensitivity (1) will be used.
 bool bestMode = 0;					// variable used to control print statement
 int estCount = 0;					// variable used to control print statement
@@ -62,6 +63,10 @@ int original_m = 0;					// resets the m value in adaptive length algorithm
 int original_M = 0;					// resets the M value in adaptive length algorithm
 bool isRegionCreated = false;		// makes sure homologous_array is created only once
 bool require_symmetry = false;		// if true, score and print each seed together with its reverse
+const int MAX_FROZEN = 32;
+int nFrozen = 0;					// Hold this many leading seeds while growing k from k-1
+char frozenSeed[MAX_FROZEN][100];
+int frozenLen[MAX_FROZEN];
 
 // One automaton node: 7 columns, same layout as the old BS[i][0..6].
 struct BSNode {
@@ -162,6 +167,7 @@ struct SeedBuf {
 static thread_local OcBuf tls_oc;
 static thread_local DpBuf tls_dp;
 static thread_local SeedBuf tls_restart;
+static thread_local SeedBuf tls_oc_exp;
 
 static inline int8_t& oc_om(int8_t* om, int nSeeds, int maxLen, int a, int b, int r, int c)
 {
@@ -671,6 +677,77 @@ void copy_seed_set(char** dst, char** src, int* dstLen, int* srcLen, int nSeeds)
 	}
 }
 
+void set_frozen_from(char** seeds, int* lens, int n)
+{
+	nFrozen = n;
+	if (nFrozen > MAX_FROZEN)
+		nFrozen = MAX_FROZEN;
+	for (int i = 0; i < nFrozen; ++i) {
+		frozenLen[i] = lens[i];
+		for (int j = 0; j <= lens[i]; ++j)
+			frozenSeed[i][j] = seeds[i][j];
+	}
+}
+
+void copy_frozen_into(char** seeds, int* lens)
+{
+	for (int i = 0; i < nFrozen; ++i) {
+		lens[i] = frozenLen[i];
+		for (int j = 0; j <= frozenLen[i]; ++j)
+			seeds[i][j] = frozenSeed[i][j];
+	}
+}
+
+int pick_mutable_seed(int nSeeds)
+{
+	if (nSeeds <= 0)
+		return -1;
+	int lo = nFrozen;
+	if (lo < 0)
+		lo = 0;
+	if (lo >= nSeeds)
+		return -1;
+	if (lo == 0)
+		return ale_rand() % nSeeds;
+	return lo + ale_rand() % (nSeeds - lo);
+}
+
+int pick_any_seed(int nSeeds)
+{
+	if (nSeeds <= 0)
+		return -1;
+	return ale_rand() % nSeeds;
+}
+
+bool core_start_unchanged(const char* s, int oldLo)
+{
+	return find_leftmost_core_start(s) == oldLo;
+}
+
+bool parse_seed_arg(const char* arg, char* dst, int* outLen)
+{
+	int n = (int)strlen(arg);
+	if (n < 1 || n >= 100)
+		return false;
+	int ones = 0;
+	for (int i = 0; i < n; ++i) {
+		if (arg[i] != '0' && arg[i] != '1')
+			return false;
+		dst[i] = arg[i];
+		if (arg[i] == '1')
+			ones++;
+	}
+	dst[n] = '\0';
+	*outLen = n;
+	if (ones != w)
+		return false;
+	if (n > upperBound || n < w)
+		return false;
+	if (!has_required_core_length(dst))
+		return false;
+	return true;
+}
+
 // Quality of a flank 1: not glued to the core, complementary at this offset
 // (other seeds have 0). Mild isolation only — strict 101010 tails explode the DP.
 int flank_one_quality(char** seeds, int* length, int nSeeds, int si, int pos, int coreLo, int coreHi)
@@ -792,10 +869,13 @@ bool local_swap_outside_core(char** seeds, int* l, int nSeeds)
 {
 	int fbSi = -1, fbI = 0, fbJ = 0;
 	for (int attempt = 0; attempt < 40; ++attempt) {
-		int si = ale_rand() % nSeeds;
+		int si = pick_any_seed(nSeeds);
+		if (si < 0)
+			return false;
 		int len = l[si];
 		if (len < 3)
 			continue;
+		int oldLo = find_leftmost_core_start(seeds[si]);
 		int i = 1 + ale_rand() % (len - 2);
 		int j = 1 + ale_rand() % (len - 2);
 		if (i == j || seeds[si][i] != '1' || seeds[si][j] != '0')
@@ -805,7 +885,8 @@ bool local_swap_outside_core(char** seeds, int* l, int nSeeds)
 		int before = seed_flank_quality(seeds, l, nSeeds, si);
 		seeds[si][i] = '0';
 		seeds[si][j] = '1';
-		if (!has_required_core_length(seeds[si])) {
+		if (!has_required_core_length(seeds[si])
+			|| (si < nFrozen && !core_start_unchanged(seeds[si], oldLo))) {
 			seeds[si][i] = '1';
 			seeds[si][j] = '0';
 			continue;
@@ -821,9 +902,11 @@ bool local_swap_outside_core(char** seeds, int* l, int nSeeds)
 	}
 	if (fbSi < 0)
 		return false;
+	int oldLo = find_leftmost_core_start(seeds[fbSi]);
 	seeds[fbSi][fbI] = '0';
 	seeds[fbSi][fbJ] = '1';
-	if (!has_required_core_length(seeds[fbSi])) {
+	if (!has_required_core_length(seeds[fbSi])
+		|| (fbSi < nFrozen && !core_start_unchanged(seeds[fbSi], oldLo))) {
 		seeds[fbSi][fbI] = '1';
 		seeds[fbSi][fbJ] = '0';
 		return false;
@@ -862,40 +945,104 @@ bool inter_seed_swap_outside_core(char** seeds, int* l, int nSeeds)
 	return false;
 }
 
-// shift one seed's leftmost m-core left (-1) or right (+1); cores stay independent per seed
+// Move the m-core to newLo, keeping extra 1s at the same offsets when they
+// stay outside the new core. Vacated core cells absorb leftover weight.
+bool place_core_keep_flanks(char* seed, int len, int newLo)
+{
+	if (newLo < 0 || newLo + cl > len)
+		return false;
+	int oldLo = find_leftmost_core_start(seed);
+	if (oldLo < 0 || newLo == oldLo)
+		return false;
+
+	char saved[100];
+	int flank[100], nFlank = 0, ones0 = 0;
+	for (int j = 0; j < len; ++j) {
+		saved[j] = seed[j];
+		if (seed[j] == '1') {
+			ones0++;
+			if (j < oldLo || j >= oldLo + cl)
+				flank[nFlank++] = j;
+		}
+	}
+
+	for (int j = 0; j < len; ++j)
+		seed[j] = '0';
+	for (int i = 0; i < cl; ++i)
+		seed[newLo + i] = '1';
+	seed[len - 1] = '1';
+	seed[len] = '\0';
+	for (int t = 0; t < nFlank; ++t) {
+		int pos = flank[t];
+		if (pos < newLo || pos >= newLo + cl)
+			seed[pos] = '1';
+	}
+
+	int ones = 0;
+	for (int j = 0; j < len; ++j)
+		if (seed[j] == '1')
+			ones++;
+
+	while (ones < ones0) {
+		bool placed = false;
+		for (int j = oldLo; j < oldLo + cl && ones < ones0; ++j) {
+			if ((j >= newLo && j < newLo + cl) || seed[j] != '0')
+				continue;
+			seed[j] = '1';
+			ones++;
+			placed = true;
+		}
+		if (placed)
+			continue;
+		for (int j = 0; j < len; ++j) {
+			if ((j >= newLo && j < newLo + cl) || seed[j] != '0')
+				continue;
+			seed[j] = '1';
+			ones++;
+			placed = true;
+			break;
+		}
+		if (!placed)
+			break;
+	}
+	while (ones > ones0) {
+		bool dropped = false;
+		for (int j = oldLo; j < oldLo + cl && ones > ones0; ++j) {
+			if ((j >= newLo && j < newLo + cl) || j == 0 || j == len - 1 || seed[j] != '1')
+				continue;
+			seed[j] = '0';
+			ones--;
+			dropped = true;
+		}
+		if (dropped)
+			continue;
+		for (int j = 1; j < len - 1; ++j) {
+			if ((j >= newLo && j < newLo + cl) || seed[j] != '1')
+				continue;
+			seed[j] = '0';
+			ones--;
+			dropped = true;
+			break;
+		}
+		if (!dropped)
+			break;
+	}
+
+	if (ones != ones0 || !has_required_core_length(seed)) {
+		for (int j = 0; j <= len; ++j)
+			seed[j] = saved[j];
+		return false;
+	}
+	return true;
+}
+
+// shift one seed's leftmost m-core left or right; extra 1s stay put when possible
 bool shift_seed_core(char** seeds, int* l, int seedIdx, int direction)
 {
 	int coreLo = find_leftmost_core_start(seeds[seedIdx]);
 	if (coreLo < 0)
 		return false;
-	int newLo = coreLo + direction;
-	int len = l[seedIdx];
-	if (newLo < 0 || newLo + cl > len)
-		return false;
-
-	char saved[100];
-	for (int j = 0; j < len; ++j)
-		saved[j] = seeds[seedIdx][j];
-
-	for (int i = 0; i < cl; ++i)
-		seeds[seedIdx][coreLo + i] = '0';
-	for (int i = 0; i < cl; ++i)
-		seeds[seedIdx][newLo + i] = '1';
-
-	int newW = 0;
-	for (int j = 0; j < len; ++j)
-		if (seeds[seedIdx][j] == '1')
-			newW++;
-	int oldW = 0;
-	for (int j = 0; j < len; ++j)
-		if (saved[j] == '1')
-			oldW++;
-	if (newW != oldW || !has_required_core_length(seeds[seedIdx])) {
-		for (int j = 0; j < len; ++j)
-			seeds[seedIdx][j] = saved[j];
-		return false;
-	}
-	return true;
+	return place_core_keep_flanks(seeds[seedIdx], l[seedIdx], coreLo + direction);
 }
 
 bool relocate_seed_core(char** seeds, int* l, int seedIdx)
@@ -907,29 +1054,7 @@ bool relocate_seed_core(char** seeds, int* l, int seedIdx)
 	if (coreLo < 0)
 		return false;
 	int newLo = ale_rand() % (len - cl + 1);
-	if (newLo == coreLo)
-		return false;
-
-	char saved[100];
-	for (int j = 0; j < len; ++j)
-		saved[j] = seeds[seedIdx][j];
-
-	for (int i = 0; i < cl; ++i)
-		seeds[seedIdx][coreLo + i] = '0';
-	for (int i = 0; i < cl; ++i)
-		seeds[seedIdx][newLo + i] = '1';
-
-	int newW = 0, oldW = 0;
-	for (int j = 0; j < len; ++j) {
-		if (seeds[seedIdx][j] == '1') newW++;
-		if (saved[j] == '1') oldW++;
-	}
-	if (newW != oldW || !has_required_core_length(seeds[seedIdx])) {
-		for (int j = 0; j < len; ++j)
-			seeds[seedIdx][j] = saved[j];
-		return false;
-	}
-	return true;
+	return place_core_keep_flanks(seeds[seedIdx], len, newLo);
 }
 
 bool apply_local_mutation(char** seeds, int* l, int nSeeds)
@@ -941,12 +1066,16 @@ bool apply_local_mutation(char** seeds, int* l, int nSeeds)
 		if (choice < 5)
 			moved = local_swap_outside_core(seeds, l, nSeeds) || moved;
 		else if (choice < 7) {
-			int si = ale_rand() % nSeeds;
+			int si = pick_mutable_seed(nSeeds);
+			if (si < 0)
+				continue;
 			int dir = (ale_rand() % 2 == 0) ? -1 : 1;
 			moved = shift_seed_core(seeds, l, si, dir) || moved;
 		}
 		else {
-			int si = ale_rand() % nSeeds;
+			int si = pick_mutable_seed(nSeeds);
+			if (si < 0)
+				continue;
 			moved = relocate_seed_core(seeds, l, si) || moved;
 		}
 	}
@@ -992,7 +1121,8 @@ double greedy_tail_ascent(char** globalBest, int* globalBestLen, int nSeeds, int
 						continue;
 					work[si][i] = '0';
 					work[si][j] = '1';
-					if (!has_required_core_length(work[si])) {
+					if (!has_required_core_length(work[si])
+						|| (si < nFrozen && !core_start_unchanged(work[si], coreLo))) {
 						work[si][i] = '1';
 						work[si][j] = '0';
 						continue;
@@ -1016,6 +1146,88 @@ double greedy_tail_ascent(char** globalBest, int* globalBestLen, int nSeeds, int
 						work[si][j] = '0';
 					}
 				}
+			}
+		}
+	}
+
+	for (int i = 0; i < nSeeds; ++i)
+		delete[] work[i];
+	delete[] work;
+	delete[] workLen;
+	return bestSens;
+}
+
+// Slide each seed's m-core by ±1..±CORE_SLIDE_MAX, keeping flanks; score with sensitivity.
+double greedy_core_slide(char** globalBest, int* globalBestLen, int nSeeds, int N, double p,
+	double bestSens, double t0, int parentTry)
+{
+	char** work = new char* [nSeeds];
+	int* workLen = new int [nSeeds];
+	for (int i = 0; i < nSeeds; ++i) {
+		work[i] = new char[100];
+		workLen[i] = globalBestLen[i];
+	}
+	copy_seed_set(work, globalBest, workLen, globalBestLen, nSeeds);
+
+	bool any = true;
+	int passes = 0;
+	while (any && passes < 8) {
+		any = false;
+		passes++;
+		for (int si = 0; si < nSeeds; ++si) {
+			if (si < nFrozen)
+				continue;
+			int len = workLen[si];
+			char orig[100], bestMove[100];
+			for (int j = 0; j <= len; ++j)
+				orig[j] = work[si][j];
+			double bestMoveSens = bestSens;
+			bool haveMove = false;
+			int origLo = find_leftmost_core_start(orig);
+			if (origLo < 0)
+				continue;
+			for (int delta = -CORE_SLIDE_MAX; delta <= CORE_SLIDE_MAX; ++delta) {
+				if (delta == 0)
+					continue;
+				for (int j = 0; j <= len; ++j)
+					work[si][j] = orig[j];
+				if (!place_core_keep_flanks(work[si], len, origLo + delta)) {
+					for (int j = 0; j <= len; ++j)
+						work[si][j] = orig[j];
+					continue;
+				}
+				if (!has_required_core_length(work[si]) || !all_seeds_have_weight(work, nSeeds, w)) {
+					for (int j = 0; j <= len; ++j)
+						work[si][j] = orig[j];
+					continue;
+				}
+				bool usedEst = false;
+				double curSens = MultipleSensitivity(work, nSeeds, N, p, totalVirtualMem, &usedEst);
+				if (curSens > bestMoveSens) {
+					bestMoveSens = curSens;
+					bestMode = usedEst;
+					haveMove = true;
+					for (int j = 0; j <= len; ++j)
+						bestMove[j] = work[si][j];
+				}
+			}
+			if (haveMove) {
+				for (int j = 0; j <= len; ++j)
+					work[si][j] = bestMove[j];
+				bestSens = bestMoveSens;
+				copy_seed_set(globalBest, work, globalBestLen, workLen, nSeeds);
+				any = true;
+				double elapsed = clock()/ 1000000.0 - t0;
+				cout << "\n --- core slide seed " << si
+					<< " (from try " << parentTry << ") --- " << endl;
+				cout << "seeds:" << endl;
+				print_seed_set(globalBest, nSeeds);
+				cout << "Real sensitivity = " << bestSens << endl;
+				cout <<"time (since beginning): "<< elapsed << endl << flush;
+			}
+			else {
+				for (int j = 0; j <= len; ++j)
+					work[si][j] = orig[j];
 			}
 		}
 	}
@@ -1132,6 +1344,8 @@ double polish_global_best(char** globalBest, int* globalBestLen, int nSeeds, int
 	double bestSens, double t0)
 {
 	cout << "\n --- final polish --- " << endl;
+	bestSens = greedy_core_slide(globalBest, globalBestLen, nSeeds, N, p, bestSens, t0, -1);
+	bestSens = greedy_tail_ascent(globalBest, globalBestLen, nSeeds, N, p, bestSens, t0, -1);
 	bestSens = local_search_from_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t0, -1,
 		POLISH_STEPS, POLISH_STALE, FIND_OPTIMAL_POLISH);
 
@@ -1216,43 +1430,70 @@ void init_seeds_spread_cores(int weight, int* length, char** seeds, int nSeeds, 
 	}
 }
 
-// swaps (fast) 1-* to improve overlaps of "seeds"
-int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
-{   // until no longer possible; returns the overlaps obtained
-	int64_t bestOC = 0, curOC = 0, oldOC = 0, k_cur_seed_OC = 0, k_best_seed_OC = 0;
-	int found_swap=0, cur_seed=0, cur_seed_length = 0, best_i=0, best_j=0,
-	best_seed=0, k=0, no_swaps=0, i = 0, j = 0, l = 0, tmp = 0;
-	j = (int)strlen(SEEDS[0]);
-	int weight = 0;	for (i=0; i<j; i++) if (SEEDS[0][i] == '1') ++weight;
-	int maxLen = 0;
-	for (i=0; i<NO_SEEDS; i++) {
-		int li = (int)strlen(SEEDS[i]);
-		if (li > maxLen)
-			maxLen = li;
+// Initialize seed si only, placing its core away from seeds 0..si-1 and filling
+// flanks to complement the frozen / already-placed seeds.
+void init_added_seed(int weight, int* length, char** seeds, int nSeeds, int si, int perm)
+{
+	int len = length[si];
+	if (len < 1)
+		return;
+	for (int j = 0; j < len; j++)
+		seeds[si][j] = '0';
+	int slots = len - cl + 1;
+	if (slots < 1)
+		slots = 1;
+	int bestStart = 0;
+	int bestScore = -1;
+	for (int start = 0; start < slots; ++start) {
+		int minD = 1000;
+		for (int o = 0; o < si; ++o) {
+			int oc = find_leftmost_core_start(seeds[o]);
+			if (oc < 0)
+				continue;
+			int d = start - oc;
+			if (d < 0)
+				d = -d;
+			if (d < minD)
+				minD = d;
+		}
+		if (si == 0)
+			minD = start + 1;
+		int score = minD;
+		if ((perm % 3) == 0 && (start == 0 || start == slots - 1))
+			score += 2;
+		if (score > bestScore) {
+			bestScore = score;
+			bestStart = start;
+		}
 	}
-	tls_oc.ensure(NO_SEEDS, maxLen);
-	const int strideS = tls_oc.capSeeds;
-	const int strideL = tls_oc.capLen;
-	const int maxSigma = 2 * strideL - 1;
-	int* length = tls_oc.length;
-	int8_t* om = tls_oc.om;
-	int8_t* sigma = tls_oc.sigma;
-	int64_t* ocm = tls_oc.ocm;
-	int8_t* tempSigma = tls_oc.tempSigma;
-	for (i=0; i<NO_SEEDS; i++)
-		length[i] = (int)strlen(SEEDS[i]);
+	if ((perm % 5) == 0 && slots > 1)
+		bestStart = ale_rand() % slots;
+	for (int j = bestStart; j < bestStart + cl && j < len; ++j)
+		seeds[si][j] = '1';
+	seeds[si][len - 1] = '1';
+	seeds[si][len] = '\0';
+	int coreLo = find_leftmost_core_start(seeds[si]);
+	if (coreLo < 0)
+		coreLo = 0;
+	place_flank_ones(seeds, length, nSeeds, si, weight, coreLo, coreLo + cl);
+}
+
+static int64_t oc_fill_from_seeds(char** SEEDS, int NO_SEEDS, int* length,
+	int8_t* om, int8_t* sigma, int64_t* ocm, int strideS, int strideL, int maxSigma)
+{
 	memset(om, 0, (size_t)strideS * (size_t)strideS * (size_t)strideL * (size_t)strideL);
 	memset(sigma, 0, (size_t)strideS * (size_t)strideS * (size_t)maxSigma);
 	memset(ocm, 0, (size_t)strideS * (size_t)strideS * sizeof(int64_t));
-	for (i=0; i<NO_SEEDS; ++i) {
-		for (j=i; j<NO_SEEDS; ++j) {
+	int64_t curOC = 0;
+	for (int i = 0; i < NO_SEEDS; ++i) {
+		for (int j = i; j < NO_SEEDS; ++j) {
 			int8_t* sig = oc_sigma(sigma, strideS, maxSigma, i, j);
-			for (k=0; k<length[i]; ++k) {
-				for (l=0; l<length[j]; ++l) {
+			for (int k = 0; k < length[i]; ++k) {
+				for (int l = 0; l < length[j]; ++l) {
 					int8_t v;
 					if ((SEEDS[i][k] == '1') && (SEEDS[j][l] == '1')) {
 						v = 1;
-						++sig[length[j]-1+k-l];
+						++sig[length[j] - 1 + k - l];
 					}
 					else if ((SEEDS[i][k] != '1') && (SEEDS[j][l] != '1'))
 						v = 0;
@@ -1262,31 +1503,169 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 				}
 			}
 			int64_t pairOC = 0;
-			for (k=0; k<length[i]+length[j]-1; ++k)
+			for (int k = 0; k < length[i] + length[j] - 1; ++k)
 				pairOC += (1 << (int)sig[k]);
 			oc_ocm(ocm, strideS, i, j) = pairOC;
 			curOC += pairOC;
 		}
 	}
+	return curOC;
+}
+
+static int64_t pair_oc_strings(const char* a, int la, const char* b, int lb)
+{
+	int n = la + lb - 1;
+	int8_t sig[200];
+	if (n < 1)
+		return 0;
+	if (n > 200)
+		n = 200;
+	memset(sig, 0, (size_t)n);
+	for (int i = 0; i < la; ++i) {
+		if (a[i] != '1')
+			continue;
+		for (int j = 0; j < lb; ++j) {
+			if (b[j] == '1') {
+				int off = lb - 1 + i - j;
+				if (off >= 0 && off < n)
+					++sig[off];
+			}
+		}
+	}
+	int64_t s = 0;
+	for (int k = 0; k < n; ++k)
+		s += (int64_t)1 << (int)sig[k];
+	return s;
+}
+
+static int64_t oc_touch_ocm(int64_t* ocm, int strideS, int nT, int s, int r)
+{
+	int64_t t = 0;
+	for (int k = 0; k < nT; ++k) {
+		int a = (k < s) ? k : s;
+		int b = (k > s) ? k : s;
+		t += oc_ocm(ocm, strideS, a, b);
+	}
+	if (r >= 0 && r != s) {
+		for (int k = 0; k < nT; ++k) {
+			if (k == s)
+				continue;
+			int a = (k < r) ? k : r;
+			int b = (k > r) ? k : r;
+			t += oc_ocm(ocm, strideS, a, b);
+		}
+	}
+	return t;
+}
+
+static int64_t oc_touch_strings(char** S, int* length, int nT, int s, int r)
+{
+	int64_t t = 0;
+	for (int k = 0; k < nT; ++k)
+		t += pair_oc_strings(S[s], length[s], S[k], length[k]);
+	if (r >= 0 && r != s) {
+		for (int k = 0; k < nT; ++k) {
+			if (k == s)
+				continue;
+			t += pair_oc_strings(S[r], length[r], S[k], length[k]);
+		}
+	}
+	return t;
+}
+
+static bool oc_swap_allowed(char* seed, int i, int j, int oldLo, bool coreLocked)
+{
+	if (seed[i] != '1' || seed[j] == '1')
+		return false;
+	if (coreLocked && (is_in_leftmost_core(seed, i) || is_in_leftmost_core(seed, j)))
+		return false;
+	seed[i] = '0';
+	seed[j] = '1';
+	bool ok = has_required_core_length(seed)
+		&& (!coreLocked || core_start_unchanged(seed, oldLo));
+	seed[i] = '1';
+	seed[j] = '0';
+	return ok;
+}
+
+static void oc_sync_reverse(char** buf, int* length, int s, int nDesigned)
+{
+	reverse_copy_seed(buf[s], buf[nDesigned + s], length[s]);
+	length[nDesigned + s] = length[s];
+}
+
+// swaps (fast) 1-* to improve overlaps of "seeds"
+int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
+{   // until no longer possible; returns the overlaps obtained
+	int64_t bestOC = 0, curOC = 0, oldOC = 0, k_cur_seed_OC = 0, k_best_seed_OC = 0;
+	int found_swap=0, cur_seed=0, cur_seed_length = 0, best_i=0, best_j=0,
+	best_seed=0, k=0, no_swaps=0, i = 0, j = 0, l = 0, tmp = 0;
+	int nDesigned = NO_SEEDS;
+	int nTotal = require_symmetry ? (NO_SEEDS * 2) : NO_SEEDS;
+	char** work = SEEDS;
+	if (require_symmetry) {
+		tls_oc_exp.ensure(nTotal);
+		work = tls_oc_exp.ptrs;
+		for (i = 0; i < nDesigned; ++i) {
+			int li = (int)strlen(SEEDS[i]);
+			tls_oc_exp.lens[i] = li;
+			for (j = 0; j <= li; ++j)
+				work[i][j] = SEEDS[i][j];
+			oc_sync_reverse(work, tls_oc_exp.lens, i, nDesigned);
+		}
+	}
+	j = (int)strlen(work[0]);
+	int weight = 0;	for (i=0; i<j; i++) if (work[0][i] == '1') ++weight;
+	int maxLen = 0;
+	for (i=0; i<nTotal; i++) {
+		int li = require_symmetry ? tls_oc_exp.lens[i] : (int)strlen(work[i]);
+		if (li > maxLen)
+			maxLen = li;
+	}
+	tls_oc.ensure(nTotal, maxLen);
+	const int strideS = tls_oc.capSeeds;
+	const int strideL = tls_oc.capLen;
+	const int maxSigma = 2 * strideL - 1;
+	int* length = tls_oc.length;
+	int8_t* om = tls_oc.om;
+	int8_t* sigma = tls_oc.sigma;
+	int64_t* ocm = tls_oc.ocm;
+	int8_t* tempSigma = tls_oc.tempSigma;
+	for (i=0; i<nTotal; i++)
+		length[i] = require_symmetry ? tls_oc_exp.lens[i] : (int)strlen(work[i]);
+	curOC = oc_fill_from_seeds(work, nTotal, length, om, sigma, ocm, strideS, strideL, maxSigma);
 	bestOC = curOC;
 	do{
 		found_swap = 0;
-		for(cur_seed=0; cur_seed<NO_SEEDS; ++cur_seed) {
+		for(cur_seed=0; cur_seed<nDesigned; ++cur_seed) {
+			bool coreLocked = (cur_seed < nFrozen);
+			int oldLo = coreLocked ? find_leftmost_core_start(work[cur_seed]) : -1;
 			cur_seed_length = length[cur_seed];
+			int rev = require_symmetry ? (cur_seed + nDesigned) : -1;
 			for (i=1; i<cur_seed_length-1; ++i)
 				for (j=1; j<cur_seed_length-1; ++j)
-					if (SEEDS[cur_seed][i] == '1' && SEEDS[cur_seed][j] != '1') {
-						SEEDS[cur_seed][i] = '0';
-						SEEDS[cur_seed][j] = '1';
-						if (!has_required_core_length(SEEDS[cur_seed])) {
-							SEEDS[cur_seed][i] = '1';
-							SEEDS[cur_seed][j] = '0';
+					if (oc_swap_allowed(work[cur_seed], i, j, oldLo, coreLocked)) {
+						if (require_symmetry) {
+							int64_t oldTouch = oc_touch_ocm(ocm, strideS, nTotal, cur_seed, rev);
+							work[cur_seed][i] = '0';
+							work[cur_seed][j] = '1';
+							oc_sync_reverse(work, length, cur_seed, nDesigned);
+							int64_t newTouch = oc_touch_strings(work, length, nTotal, cur_seed, rev);
+							int64_t candOC = curOC - oldTouch + newTouch;
+							work[cur_seed][i] = '1';
+							work[cur_seed][j] = '0';
+							oc_sync_reverse(work, length, cur_seed, nDesigned);
+							if (candOC < bestOC) {
+								best_seed = cur_seed;
+								best_i = i;
+								best_j = j;
+								bestOC = candOC;
+								found_swap = 1;
+							}
 							continue;
 						}
-						SEEDS[cur_seed][i] = '1';
-						SEEDS[cur_seed][j] = '0';
 						oldOC = curOC;
-						for (k=0; k<NO_SEEDS; ++k) {
+						for (k=0; k<nTotal; ++k) {
 							int a = (k < cur_seed) ? k : cur_seed;
 							int b = (k > cur_seed) ? k : cur_seed;
 							int tempSigmaLength = length[k]+cur_seed_length-1;
@@ -1312,32 +1691,46 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 		}
 		if (found_swap == 1) {
 			no_swaps++;
-			if (no_swaps >= weight * NO_SEEDS)
+			if (no_swaps >= weight * nDesigned)
 				found_swap = 0;
-			for (k=0; k<NO_SEEDS; ++k) {
-				int a = (k < best_seed) ? k : best_seed;
-				int b = (k > best_seed) ? k : best_seed;
-				UPDATE_SIGMA(om, strideS, strideL, oc_sigma(sigma, strideS, maxSigma, a, b),
-					length, k, best_seed, best_i, best_j);
+			work[best_seed][best_i] = '0';
+			work[best_seed][best_j] = '1';
+			if (require_symmetry) {
+				oc_sync_reverse(work, length, best_seed, nDesigned);
+				curOC = oc_fill_from_seeds(work, nTotal, length, om, sigma, ocm, strideS, strideL, maxSigma);
+				bestOC = curOC;
 			}
-			SEEDS[best_seed][best_i] = '0';
-			SEEDS[best_seed][best_j] = '1';
-			for (k=0; k<NO_SEEDS; ++k)
-				UPDATE_OM(om, strideS, strideL, length, k, best_seed, best_i, best_j);
-			for (k=0; k<NO_SEEDS; ++k) {
-				int a = (k < best_seed) ? k : best_seed;
-				int b = (k > best_seed) ? k : best_seed;
-				k_best_seed_OC = 0;
-				int8_t* sig = oc_sigma(sigma, strideS, maxSigma, a, b);
-				for (l=0; l<length[k]+length[best_seed]-1; ++l) {
-					tmp = (int)sig[l];
-					k_best_seed_OC += (1 << tmp);
+			else {
+				for (k=0; k<nTotal; ++k) {
+					int a = (k < best_seed) ? k : best_seed;
+					int b = (k > best_seed) ? k : best_seed;
+					UPDATE_SIGMA(om, strideS, strideL, oc_sigma(sigma, strideS, maxSigma, a, b),
+						length, k, best_seed, best_i, best_j);
 				}
-				oc_ocm(ocm, strideS, a, b) = k_best_seed_OC;
+				for (k=0; k<nTotal; ++k)
+					UPDATE_OM(om, strideS, strideL, length, k, best_seed, best_i, best_j);
+				for (k=0; k<nTotal; ++k) {
+					int a = (k < best_seed) ? k : best_seed;
+					int b = (k > best_seed) ? k : best_seed;
+					k_best_seed_OC = 0;
+					int8_t* sig = oc_sigma(sigma, strideS, maxSigma, a, b);
+					for (l=0; l<length[k]+length[best_seed]-1; ++l) {
+						tmp = (int)sig[l];
+						k_best_seed_OC += (1 << tmp);
+					}
+					oc_ocm(ocm, strideS, a, b) = k_best_seed_OC;
+				}
 			}
 			oldOC = curOC = bestOC;
 		}
 	} while(found_swap == 1);
+	if (require_symmetry) {
+		for (i = 0; i < nDesigned; ++i) {
+			int li = length[i];
+			for (j = 0; j <= li; ++j)
+				SEEDS[i][j] = work[i][j];
+		}
+	}
 	return(bestOC);
 }
 
@@ -1788,13 +2181,16 @@ void pick_restart_lengths(int* length_arr, int nSeeds, int weight, int perm)
 	int lo = weight;
 	if (lo < cl) lo = cl;
 	if (lo > hi) lo = hi;
-	if (perm % 2 == 0) {
-		for (int i = 0; i < nSeeds; i++)
+	for (int i = 0; i < nSeeds; i++) {
+		if (i < nFrozen) {
+			length_arr[i] = frozenLen[i];
+			continue;
+		}
+		if (perm % 2 == 0)
 			length_arr[i] = hi;
-		return;
+		else
+			length_arr[i] = lo + ale_rand() % (hi - lo + 1);
 	}
-	for (int i = 0; i < nSeeds; i++)
-		length_arr[i] = lo + ale_rand() % (hi - lo + 1);
 }
 
 void MAKE_L(int m, int M)
@@ -1897,7 +2293,9 @@ int add_position(char** S, int* l, int NO_SEEDS, long long N){
 		count++;
 		if(count == 40)
 			return -1;
-		seed_no = ale_rand() % NO_SEEDS;
+		seed_no = pick_mutable_seed(NO_SEEDS);
+		if (seed_no < 0)
+			return -1;
 		pos = ale_rand() % (l[seed_no]);
 		if(pos != 0 && pos != l[seed_no] - 1 && l[seed_no] < N
 			&& is_valid_add_position(S[seed_no], pos))
@@ -1932,7 +2330,9 @@ int remove_position(char** S, int* l, int NO_SEEDS, long long N){
 	while(flag){
 		if(count == 40)
 			return -1;
-		seed_no = ale_rand() % NO_SEEDS;
+		seed_no = pick_mutable_seed(NO_SEEDS);
+		if (seed_no < 0)
+			return -1;
 		pos = ale_rand() % (l[seed_no]);
 		if(S[seed_no][pos] == '0'
 			&& pos != 0 && pos != l[seed_no] - 1
@@ -2220,7 +2620,12 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 			if (doPerturb)
 				perturb_from_best(localSeeds, localLen, nSeeds);
 			else if (!doCrossover) {
-				if (k % 2 == 0)
+				if (nFrozen > 0) {
+					copy_frozen_into(localSeeds, localLen);
+					for (int si = nFrozen; si < nSeeds; ++si)
+						init_added_seed(weight, localLen, localSeeds, nSeeds, si, k + si);
+				}
+				else if (k % 2 == 0)
 					init_seeds_spread_cores(weight, localLen, localSeeds, nSeeds, k);
 				else
 					init_seeds_with_core(weight, localLen, localSeeds, nSeeds);
@@ -2260,6 +2665,8 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 						bestMode = curUsedEstimate;
 						copy_seed_set(globalBest, localSeeds, globalBestLen, localLen, nSeeds);
 						haveGlobalBest = true;
+						if (nFrozen > 0)
+							set_frozen_from(globalBest, globalBestLen, nFrozen);
 						copy_seed_set(elite[elitePos], localSeeds, eliteLen[elitePos], localLen, nSeeds);
 						elitePos = (elitePos + 1) % ELITE_MAX;
 						if (nElite < ELITE_MAX)
@@ -2282,8 +2689,11 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 		}
 
 		if (batchImproved) {
+			bestSens = greedy_core_slide(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
 			bestSens = greedy_tail_ascent(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
 			bestSens = local_search_from_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
+			if (nFrozen > 0)
+				set_frozen_from(globalBest, globalBestLen, nFrozen);
 			copy_seed_set(elite[elitePos], globalBest, eliteLen[elitePos], globalBestLen, nSeeds);
 			elitePos = (elitePos + 1) % ELITE_MAX;
 			if (nElite < ELITE_MAX)
@@ -2311,8 +2721,13 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 		}
 	}
 
-	if (haveGlobalBest)
+	if (haveGlobalBest) {
+		int held = nFrozen;
+		nFrozen = 0;
 		bestSens = polish_global_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0]);
+		nFrozen = held;
+		copy_seed_set(seeds, globalBest, length, globalBestLen, nSeeds);
+	}
 
 	if (haveGlobalBest && require_symmetry) {
 		cout << endl << " --- designed seeds and their reverses --- " << endl;
@@ -2380,57 +2795,84 @@ void ALeS(char** S){
 	if (M < m) M = m;
 		
 	cout<<"Generating "<< k << " seeds of weight "<<w<<" for similarity level "<< p <<" and length of homology region "<< N<<endl<<endl;
-	
-	if (k == 1){
-		if(upperBound > w)
-			m = w+1; // try a wide range of lengths for single seeds
-		cout << "The program starts computing ..."<<endl;
-		cout << "If you reach a seed with your desired sensitivity you can kill the program ... "<<endl;
-		cout<< endl;
-		RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, k, SEARCH_TRIES, N, p, 0);
-	}
-	else{
-		MAKE_L(m,M);
-		init_seeds_with_core(w, l, S, k);
-		MULTIPLE_SWAP1_OVERLAPS_FAST(S, k);
-		t[1] = clock()/ 1000000.0;
-		cout << "ALeS initial seed set is: "<<endl<<endl;
-		print_seed_set(S,k);
-		cout << "Computed in "<<t[1]-t[0]<< " seconds" << endl;
-		cout<< endl;
-		double sensitivity = 0.0;
-		sensitivity = MultipleSensitivity(S, k, N, p , totalVirtualMem);
-		bestMode = mode;
-		if(!bestMode)
-			cout << "Real Sensitivity is " << sensitivity << endl;
-		else{
-			if(estCount == 0){
-				//cout<<endl<<"Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory"<<endl;
-				//cout<<"Estimated Sensitivity will be used to prevent ALeS from Crashing!!!"<<endl<<endl;
-				estCount = 1;
+
+	int target_k = k;
+	bool successive = (nFrozen == 0 && target_k > 1);
+	int k0 = successive ? 1 : target_k;
+	if (require_symmetry)
+		cout << "Scoring designed seeds together with their reverses; OC uses the doubled set." << endl;
+	if (successive)
+		cout << "Successive construction: grow from 1 to " << target_k << " seeds." << endl;
+	else if (nFrozen > 0)
+		cout << "Growing from " << nFrozen << " core-frozen seed(s); flanks may still move." << endl;
+
+	for (int kk = k0; kk <= target_k; ++kk) {
+		k = kk;
+		if (successive && kk > 1) {
+			nFrozen = kk - 1;
+			for (int i = 0; i < nFrozen; ++i) {
+				frozenLen[i] = (int)strlen(S[i]);
+				l[i] = frozenLen[i];
+				for (int j = 0; j <= frozenLen[i]; ++j)
+					frozenSeed[i][j] = S[i][j];
 			}
-			cout<< "Estimated Sensitivity is "<<sensitivity<<endl;
+			cout << endl << "=== growing to " << kk << " seeds; freezing " << nFrozen << " ===" << endl;
+			printArray2(S, nFrozen);
 		}
-		cout<<endl;
-		cout << "The program starts computing better seeds ..."<<endl;
-		cout << "If you reach a set of seeds with your desired sensitivity you can kill the program ... "<<endl;
-		RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, k, SEARCH_TRIES, N, p, sensitivity);
+
+		if (kk == 1) {
+			if(upperBound > w)
+				m = w+1;
+			cout << "The program starts computing ..."<<endl;
+			cout << "If you reach a seed with your desired sensitivity you can kill the program ... "<<endl;
+			cout<< endl;
+			RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, kk, SEARCH_TRIES, N, p, 0);
+		}
+		else {
+			pick_restart_lengths(l, kk, w, 0);
+			copy_frozen_into(S, l);
+			for (int si = nFrozen; si < kk; ++si)
+				init_added_seed(w, l, S, kk, si, si);
+			MULTIPLE_SWAP1_OVERLAPS_FAST(S, kk);
+			t[1] = clock()/ 1000000.0;
+			cout << "ALeS initial seed set is: "<<endl<<endl;
+			print_seed_set(S,kk);
+			cout << "Computed in "<<t[1]-t[0]<< " seconds" << endl;
+			cout<< endl;
+			double sensitivity = MultipleSensitivity(S, kk, N, p , totalVirtualMem);
+			bestMode = mode;
+			if(!bestMode)
+				cout << "Real Sensitivity is " << sensitivity << endl;
+			else{
+				if(estCount == 0)
+					estCount = 1;
+				cout<< "Estimated Sensitivity is "<<sensitivity<<endl;
+			}
+			cout<<endl;
+			cout << "The program starts computing better seeds ..."<<endl;
+			cout << "If you reach a set of seeds with your desired sensitivity you can kill the program ... "<<endl;
+			RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, kk, SEARCH_TRIES, N, p, sensitivity);
+		}
+		nFrozen = 0;
 	}
+	k = target_k;
 }
 
 //verbose mode
 void verbose(){
 	
-	cerr << "Five / Six arguments required; different number given\n"
+	cerr << "Five or more arguments required; different number given\n"
 		<< "command line should be:\n"
-		<< "./ALeS <weight> <numberOfSeeds> <similarity> <lengthOfHomologyRegion> <corelength> [<upperBound>] [<symmetryFlag>]\n";
+		<< "./ALeSc <weight> <numberOfSeeds> <similarity> <lengthOfHomologyRegion> <corelength> [<upperBound>] [<symmetryFlag>] [frozenSeeds...]\n";
 	cerr<<" <weight> : Number of match positions in each seed"<<endl;
 	cerr<<" <numberOfSeeds> : Number of seeds"<<endl;
 	cerr<<" <similarity> : Similarity level"<<endl;
 	cerr<<" <lengthOfHomologyRegion> : Length of homologous region"<<endl;
 	cerr<<" <corelength> : Minimum run length of consecutive 1s required in each shape"<<endl;
 	cerr<<" <upperBound> [optional] : Seed length upper bound"<<endl;
-	cerr<<" <symmetryFlag> [optional] : 1 to score each iteration on the designed seeds plus their reverses"<<endl;
+	cerr<<" <symmetryFlag> [optional] : 1 to score each designed seed together with its reverse"<<endl;
+	cerr<<" [frozenSeeds...] : optional 01-strings; keep these cores fixed and search for the remaining seed(s)"<<endl;
+	cerr<<" With k>1 and no frozen seeds, ALeSc grows from 1 to k, then polishes the full set."<<endl;
 }
 
 // MAIN 
@@ -2439,7 +2881,7 @@ int main(int argc, char **argv)
 	double ttime[2] = {0, 0};
 	ttime[0] = clock()/ 1000000.0;
 	
-	if (argc < 6 || argc > 8) {
+	if (argc < 6) {
 		verbose();
 		exit(1);
 	}
@@ -2453,7 +2895,8 @@ int main(int argc, char **argv)
 		upperBound = N;
 	else
 		upperBound = atoi(argv[6]);  // upper bound of seed lengths
-	require_symmetry = (argc == 8) ? (atoi(argv[7]) != 0) : false;
+	require_symmetry = (argc >= 8) ? (atoi(argv[7]) != 0) : false;
+	nFrozen = 0;
 	
 	l = new int[k];		// seeds' lengths array
 	
@@ -2498,8 +2941,25 @@ int main(int argc, char **argv)
 		if(upperBound < w){
 			cerr<<"Invalid seed length upper bound !!!"<<endl;
 			cerr<<"length upper bound must be >= seed weight !!!"<<endl;
-			//verbose();
 			return 1;
+		}
+		if (argc > 8) {
+			int nf = argc - 8;
+			if (nf >= k || nf > MAX_FROZEN) {
+				cerr << "Need 1 to k-1 frozen seeds; got " << nf << " for k=" << k << endl;
+				return 1;
+			}
+			for (int i = 0; i < nf; ++i) {
+				int slen = 0;
+				if (!parse_seed_arg(argv[8 + i], frozenSeed[i], &slen)) {
+					cerr << "Invalid frozen seed " << (i + 1) << " (need weight " << w
+						<< ", core " << cl << ", length in [" << w << "," << upperBound << "])" << endl;
+					return 1;
+				}
+				frozenLen[i] = slen;
+			}
+			nFrozen = nf;
+			cout << "Using " << nFrozen << " frozen seed(s)." << endl;
 		}
 		ALeS(S);
 	}catch(std::bad_alloc){
