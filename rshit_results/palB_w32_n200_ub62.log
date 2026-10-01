@@ -1,0 +1,13 @@
+Generating 6 seeds of weight 32 for similarity level 0.9 and length of homology region 200
+
+Every shape is a palindrome, so the set is already closed under reversal.
+Successive construction: grow from 1 to 6 seeds.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (2 threads).
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating array to estimate sensitivity ...

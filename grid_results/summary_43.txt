@@ -1,0 +1,8 @@
+k=1 cl=19 ub=43 nosym best=0.501894 nSeeds=1 time=36.5s rc=0
+k=1 cl=21 ub=43 nosym best=0.477175 nSeeds=1 time=36.5s rc=0
+k=1 cl=23 ub=43 nosym best=0.445393 nSeeds=1 time=38.0s rc=0
+k=1 cl=25 ub=43 nosym best=0.408222 nSeeds=1 time=39.0s rc=0
+k=2 cl=19 ub=43 nosym best=0.6387 nSeeds=2 time=67.7s rc=0
+k=2 cl=21 ub=43 nosym best=0.603295 nSeeds=2 time=69.7s rc=0
+k=2 cl=23 ub=43 nosym best=0.552353 nSeeds=2 time=65.8s rc=0
+k=2 cl=25 ub=43 nosym best=0.487863 nSeeds=2 time=64.0s rc=0

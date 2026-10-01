@@ -1,0 +1,17 @@
+RSHit: window 150, p 0.95, minhit 0.9, at most 4 shapes
+
+=== Set A: longest m-core, palindromes forbidden, reverse-doubled ===
+weight 31, window 150, p 0.95, at most 4 designed shapes (8 in the index)
+  core  1 -> 0.9970 with 1 shape(s) ok
+  core 16 -> 0.9973 with 1 shape(s) ok
+  core 24 -> 0.9832 with 1 shape(s) ok
+  core 28 -> 0.9478 with 1 shape(s) ok
+  core 30 -> 0.9181 with 1 shape(s) ok
+  core 31 -> 0.9003 with 1 shape(s) ok
+  longest core = 31, needs 1 designed shape(s) (2 in the index)
+  final run at core 31, 1 shape(s), no early exit
+  sensitivity 0.9003 at span <= 42
+    0001111111111111111111111111111111  span=34 weight=31 core=31 palindrome=False
+
+=== Set B: palindromic, m=1, fewest shapes ===
+weight 32 down to 15, window 150, p 0.95

@@ -1,0 +1,95 @@
+Generating 2 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+ALeS initial seed set is: 
+
+111111111111111111111111111110000010001
+011111111111111111111111111111000100001
+
+Computed in 0.000268 seconds
+
+Real Sensitivity is 0.317434
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (10 threads).
+
+ --- random try number 0 --- 
+seeds:
+010000111111111111111111111111111110001
+011111111111111111111111111111000001001
+
+Real sensitivity = 0.331681
+time (since beginning): 0.019972
+
+ --- random try number 16 --- 
+seeds:
+111111111111111111111111111110000010001
+100010000011111111111111111111111111111
+
+Real sensitivity = 0.349094
+time (since beginning): 0.038108
+
+ --- random try number 6 --- 
+seeds:
+111111111111111111111111111110000010001
+010001000011111111111111111111111111111
+
+Real sensitivity = 0.349107
+time (since beginning): 0.046372
+
+ --- greedy tail (from try 6) --- 
+seeds:
+111111111111111111111111111110000100001
+010001000011111111111111111111111111111
+
+Real sensitivity = 0.349109
+time (since beginning): 0.066129
+
+ --- random try number 5239 --- 
+seeds:
+10100000011111111111111111111111111111
+1111111111111111111111111111100101
+
+Real sensitivity = 0.349205
+time (since beginning): 8.67958
+
+ --- random try number 5225 --- 
+seeds:
+10010000011111111111111111111111111111
+1111111111111111111111111111100101
+
+Real sensitivity = 0.349306
+time (since beginning): 8.68096
+
+ --- greedy tail (from try 5225) --- 
+seeds:
+10001000011111111111111111111111111111
+1111111111111111111111111111100101
+
+Real sensitivity = 0.349316
+time (since beginning): 8.69597
+
+ --- random try number 11357 --- 
+seeds:
+11111111111111111111111111111000101
+1010000011111111111111111111111111111
+
+Real sensitivity = 0.349319
+time (since beginning): 16.8861
+
+ --- greedy tail (from try 11357) --- 
+seeds:
+11111111111111111111111111111000101
+1001000011111111111111111111111111111
+
+Real sensitivity = 0.349419
+time (since beginning): 16.908
+
+ --- final polish --- 
+Polish findOptimal sensitivity = 0.349528
+
+Best sensitivity is 0.349528
+
+Computed in 16.8861 seconds
+
+Total time (12000 iterations): 17.7872 seconds

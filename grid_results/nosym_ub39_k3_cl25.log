@@ -1,0 +1,79 @@
+Using 2 frozen seed(s).
+Generating 3 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Growing from 2 core-frozen seed(s); flanks may still move.
+ALeS initial seed set is: 
+
+111111111111111111111111100010110111
+110101100010001111111111111111111111111
+111000011111111111111111111111110010101
+
+Computed in 0.000213 seconds
+
+Real Sensitivity is 0.49563
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (4 threads).
+
+ --- random try number 0 --- 
+seeds:
+111111111111111111111111100011010111
+110101100100001111111111111111111111111
+110100011111111111111111111111110010011
+
+Real sensitivity = 0.495647
+time (since beginning): 0.002821
+
+ --- random try number 11 --- 
+seeds:
+111111111111111111111111100011010111
+110101100010001111111111111111111111111
+110100111111111111111111111111100100011
+
+Real sensitivity = 0.495657
+time (since beginning): 0.006939
+
+ --- random try number 8 --- 
+seeds:
+111111111111111111111111100011010111
+110101001100001111111111111111111111111
+011111111111111111111111110010100100111
+
+Real sensitivity = 0.497011
+time (since beginning): 0.015686
+
+ --- core slide seed 2 (from try 8) --- 
+seeds:
+111111111111111111111111100011010111
+110101001100001111111111111111111111111
+111111111111111111111111100010100100111
+
+Real sensitivity = 0.499075
+time (since beginning): 0.018897
+
+ --- greedy tail (from try 8) --- 
+seeds:
+111111111111111111111111101001010111
+110101001100001111111111111111111111111
+111111111111111111111111100010100100111
+
+Real sensitivity = 0.499482
+time (since beginning): 0.022331
+
+ --- local search step 6 (from try 8) --- 
+seeds:
+111111111111111111111111100101100111
+110101001100001111111111111111111111111
+111111111111111111111111100010010100111
+
+Real sensitivity = 0.500164
+time (since beginning): 0.236453
+
+ --- final polish --- 
+
+Best sensitivity is 0.500164
+
+Computed in 0.015686 seconds
+
+Total time (12000 iterations): 7.70655 seconds

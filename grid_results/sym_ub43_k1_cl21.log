@@ -1,0 +1,91 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 15 --- 
+seeds:
+designed:
+111101011111111111111111111111111
+reversed:
+111111111111111111111111110101111
+
+Real sensitivity = 0.434477
+time (since beginning): 0.000248
+
+ --- random try number 0 --- 
+seeds:
+designed:
+1111111111111111111110010010101000110100111
+reversed:
+1110010110001010100100111111111111111111111
+
+Real sensitivity = 0.595542
+time (since beginning): 0.245061
+
+ --- random try number 6 --- 
+seeds:
+designed:
+1111111111111111111110001010110010110001011
+reversed:
+1101000110100110101000111111111111111111111
+
+Real sensitivity = 0.600911
+time (since beginning): 0.260414
+
+ --- random try number 30 --- 
+seeds:
+designed:
+1111111111111111111110000110101011001100101
+reversed:
+1010011001101010110000111111111111111111111
+
+Real sensitivity = 0.601563
+time (since beginning): 3.65599
+
+ --- random try number 58 --- 
+seeds:
+designed:
+1111111111111111111110000110100110011010101
+reversed:
+1010101100110010110000111111111111111111111
+
+Real sensitivity = 0.602381
+time (since beginning): 7.52148
+
+ --- random try number 70 --- 
+seeds:
+designed:
+1111111111111111111110000110011010101001011
+reversed:
+1101001010101100110000111111111111111111111
+
+Real sensitivity = 0.602846
+time (since beginning): 10.6299
+
+ --- random try number 498 --- 
+seeds:
+designed:
+1111111111111111111110000110011010100110101
+reversed:
+1010110010101100110000111111111111111111111
+
+Real sensitivity = 0.602951
+time (since beginning): 30.3908
+
+ --- final polish --- 
+
+ --- designed seeds and their reverses --- 
+designed:
+1111111111111111111110000110011010100110101
+reversed:
+1010110010101100110000111111111111111111111
+
+
+Best sensitivity is 0.602951
+
+Computed in 30.3908 seconds
+
+Total time (12000 iterations): 541.543 seconds

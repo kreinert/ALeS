@@ -1,0 +1,67 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating array to estimate sensitivity ...
+
+ --- random try number 15 --- 
+seeds:
+1000101100100001110101011111111111111111110101
+
+Real sensitivity = 0.442383
+time (since beginning): 0.152751
+
+ --- random try number 5 --- 
+seeds:
+0100111011111111111111111111000011001001010101
+
+Real sensitivity = 0.448121
+time (since beginning): 0.233751
+
+ --- random try number 11 --- 
+seeds:
+0110110001111111111111111111001010001010010111
+
+Real sensitivity = 0.477849
+time (since beginning): 205.97
+
+ --- greedy tail (from try 11) --- 
+seeds:
+0110010001111111111111111111001010001110010111
+
+Real sensitivity = 0.477885
+time (since beginning): 241.898
+
+ --- local search step 19 (from try 11) --- 
+seeds:
+0110110001111111111111111111000010101011001011
+
+Real sensitivity = 0.483836
+time (since beginning): 246.723
+
+ --- random try number 110 --- 
+seeds:
+0111111111111111111100001010101100011010011011
+
+Real sensitivity = 0.493957
+time (since beginning): 346.361
+
+ --- local search step 11 (from try 110) --- 
+seeds:
+111111111111111111100010110101100110010111
+
+Real sensitivity = 0.502245
+time (since beginning): 387.104
+
+ --- random try number 462 --- 
+seeds:
+111111111111111111100010101101001101100111
+
+Real sensitivity = 0.502419
+time (since beginning): 907.447

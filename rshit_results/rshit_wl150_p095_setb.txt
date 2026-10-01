@@ -1,0 +1,17 @@
+RSHit: window 150, p 0.95, minhit 0.9, at most 4 shapes
+
+=== Set B: palindromic, m=1, fewest shapes ===
+weight 32 down to 15, window 150, p 0.95
+  k=1 weight 32 -> 0.9878 ok
+  k=1 weight 33 -> 0.9741 ok
+  k=1 weight 34 -> 0.9732 ok
+  k=1 weight 35 -> 0.9659 ok
+  k=1 weight 36 -> 0.9423 ok
+  k=1 weight 37 -> 0.9323 ok
+  k=1 weight 38 -> 0.9050 ok
+  k=1 weight 39 -> 0.8909 short
+  1 palindromic shape(s), weight 32
+  weight ceiling 32 never bound: a single palindrome still works up to weight 38
+  final run at weight 32, 1 shape(s), no early exit
+  sensitivity 0.9900 at span <= 42
+    111111101011101101110011101101110101111111  span=42 weight=32 core=7 palindrome=True

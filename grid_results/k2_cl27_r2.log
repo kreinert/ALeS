@@ -1,0 +1,46 @@
+Generating 2 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+ALeS initial seed set is: 
+
+110000111111111111111111111111111000101
+011010001000111111111111111111111111111
+
+Computed in 0.000363 seconds
+
+Real Sensitivity is 0.394818
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (10 threads).
+
+ --- random try number 8 --- 
+seeds:
+111111111111111111111111111000001010011
+011001010000111111111111111111111111111
+
+Real sensitivity = 0.417238
+time (since beginning): 0.033979
+
+ --- random try number 4 --- 
+seeds:
+111111111111111111111111111000100100101
+100100101000111111111111111111111111111
+
+Real sensitivity = 0.418594
+time (since beginning): 0.037187
+
+ --- random try number 11 --- 
+seeds:
+111111111111111111111111111000100100101
+101001001000111111111111111111111111111
+
+Real sensitivity = 0.418616
+time (since beginning): 0.048553
+
+ --- final polish --- 
+
+Best sensitivity is 0.418616
+
+Computed in 0.048553 seconds
+
+Total time (12000 iterations): 19.2017 seconds

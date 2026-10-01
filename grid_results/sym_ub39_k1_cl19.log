@@ -1,0 +1,122 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 15 --- 
+seeds:
+designed:
+1111111111111111111111111111111
+reversed:
+1111111111111111111111111111111
+
+Real sensitivity = 0.285651
+time (since beginning): 0.000113
+
+ --- random try number 5 --- 
+seeds:
+designed:
+1111111111111111111111011110101111
+reversed:
+1111010111101111111111111111111111
+
+Real sensitivity = 0.526101
+time (since beginning): 0.000161
+
+ --- random try number 0 --- 
+seeds:
+designed:
+111111111111111111100011111001011101101
+reversed:
+101101110100111110001111111111111111111
+
+Real sensitivity = 0.605493
+time (since beginning): 0.005313
+
+ --- random try number 14 --- 
+seeds:
+designed:
+111111111111111111100101111010101100111
+reversed:
+111001101010111101001111111111111111111
+
+Real sensitivity = 0.616316
+time (since beginning): 0.011259
+
+ --- greedy tail (from try 14) --- 
+seeds:
+designed:
+111111111111111111100100111010111100111
+reversed:
+111001111010111001001111111111111111111
+
+Real sensitivity = 0.618557
+time (since beginning): 0.026234
+
+ --- random try number 1164 --- 
+seeds:
+designed:
+111111111111111111100101110011010111011
+reversed:
+110111010110011101001111111111111111111
+
+Real sensitivity = 0.619298
+time (since beginning): 0.842404
+
+ --- greedy tail (from try 1164) --- 
+seeds:
+designed:
+111111111111111111100001111011010111011
+reversed:
+110111010110111100001111111111111111111
+
+Real sensitivity = 0.621055
+time (since beginning): 0.847511
+
+ --- random try number 7554 --- 
+seeds:
+designed:
+111111111111111111100011010110110110111
+reversed:
+111011011011010110001111111111111111111
+
+Real sensitivity = 0.62452
+time (since beginning): 5.69827
+
+ --- greedy tail (from try 7554) --- 
+seeds:
+designed:
+111111111111111111100011010110111010111
+reversed:
+111010111011010110001111111111111111111
+
+Real sensitivity = 0.624616
+time (since beginning): 5.75437
+
+ --- random try number 7920 --- 
+seeds:
+designed:
+111111111111111111100001110110101110111
+reversed:
+111011101011011100001111111111111111111
+
+Real sensitivity = 0.624973
+time (since beginning): 6.04964
+
+ --- final polish --- 
+
+ --- designed seeds and their reverses --- 
+designed:
+111111111111111111100001110110101110111
+reversed:
+111011101011011100001111111111111111111
+
+
+Best sensitivity is 0.624973
+
+Computed in 6.04964 seconds
+
+Total time (12000 iterations): 9.2417 seconds

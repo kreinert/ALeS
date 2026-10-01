@@ -1,0 +1,91 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 5 --- 
+seeds:
+0101111111111111111111111111011111
+
+Real sensitivity = 0.372655
+time (since beginning): 0.000119
+
+ --- random try number 15 --- 
+seeds:
+110111100111111111111111111111110101
+
+Real sensitivity = 0.421077
+time (since beginning): 0.000204
+
+ --- random try number 10 --- 
+seeds:
+1111111111111111111111100010100100110001011
+
+Real sensitivity = 0.435736
+time (since beginning): 0.107555
+
+ --- random try number 6 --- 
+seeds:
+1111111111111111111111100010011000101001011
+
+Real sensitivity = 0.435825
+time (since beginning): 0.116316
+
+ --- random try number 4 --- 
+seeds:
+1111111111111111111111100001100101010010011
+
+Real sensitivity = 0.436487
+time (since beginning): 0.210818
+
+ --- random try number 28 --- 
+seeds:
+1111111111111111111111100001100100101010011
+
+Real sensitivity = 0.436651
+time (since beginning): 1.58237
+
+ --- greedy tail (from try 28) --- 
+seeds:
+1111111111111111111111100001001100101010011
+
+Real sensitivity = 0.436738
+time (since beginning): 1.77849
+
+ --- random try number 1275 --- 
+seeds:
+110100101110100011111111111111111111111
+
+Real sensitivity = 0.438682
+time (since beginning): 16.9548
+
+ --- greedy tail (from try 1275) --- 
+seeds:
+110110001110100011111111111111111111111
+
+Real sensitivity = 0.439083
+time (since beginning): 17.153
+
+ --- local search step 0 (from try 1275) --- 
+seeds:
+11010101101100011111111111111111111111
+
+Real sensitivity = 0.4451
+time (since beginning): 17.1683
+
+ --- random try number 1727 --- 
+seeds:
+11011010101100011111111111111111111111
+
+Real sensitivity = 0.445393
+time (since beginning): 21.7007
+
+ --- final polish --- 
+
+Best sensitivity is 0.445393
+
+Computed in 21.7007 seconds
+
+Total time (12000 iterations): 131.895 seconds

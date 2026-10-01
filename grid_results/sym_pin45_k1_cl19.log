@@ -1,0 +1,91 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 5 --- 
+seeds:
+1001011010000110011111111111111111111111001
+
+Real sensitivity = 0.416777
+time (since beginning): 0.023067
+
+ --- random try number 15 --- 
+seeds:
+000011011111111111111111111100011011011100001
+
+Real sensitivity = 0.427778
+time (since beginning): 0.049675
+
+ --- random try number 6 --- 
+seeds:
+111111111111111111100011001010100110100011011
+
+Real sensitivity = 0.496453
+time (since beginning): 0.786676
+
+ --- random try number 18 --- 
+seeds:
+111111111111111111100001101001100101010110011
+
+Real sensitivity = 0.498229
+time (since beginning): 0.805718
+
+ --- random try number 10 --- 
+seeds:
+111111111111111111100010100110101001100100111
+
+Real sensitivity = 0.498326
+time (since beginning): 0.85546
+
+ --- random try number 54 --- 
+seeds:
+111111111111111111100001100110101010100100111
+
+Real sensitivity = 0.499222
+time (since beginning): 20.5615
+
+ --- random try number 165 --- 
+seeds:
+111111111111111111100001010110011001010010111
+
+Real sensitivity = 0.499268
+time (since beginning): 52.2837
+
+ --- random try number 674 --- 
+seeds:
+111111111111111111100001101001100110010101011
+
+Real sensitivity = 0.499458
+time (since beginning): 142.45
+
+ --- random try number 794 --- 
+seeds:
+111111111111111111100001010101100011010011011
+
+Real sensitivity = 0.499529
+time (since beginning): 176.364
+
+ --- random try number 1118 --- 
+seeds:
+111111111111111111100001010110010100110010111
+
+Real sensitivity = 0.499892
+time (since beginning): 235.821
+
+ --- final polish --- 
+
+ --- symmetry: doubled set (2 shapes) --- 
+seeds:
+111111111111111111100001010110010100110010111
+111010011001010011010100001111111111111111111
+
+Real sensitivity = 0.640401
+
+Best sensitivity is 0.640401
+
+Computed in 235.821 seconds
+
+Total time (12000 iterations): 2029.88 seconds

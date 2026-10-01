@@ -1,0 +1,91 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 5 --- 
+seeds:
+1111111111111111111111111110010001101
+
+Real sensitivity = 0.361372
+time (since beginning): 0.001691
+
+ --- random try number 15 --- 
+seeds:
+1111111111111111111111111101001001001001
+
+Real sensitivity = 0.365388
+time (since beginning): 0.01153
+
+ --- random try number 10 --- 
+seeds:
+1111111111111111111111111000010010011000101
+
+Real sensitivity = 0.392442
+time (since beginning): 0.116153
+
+ --- random try number 11 --- 
+seeds:
+1111111111111111111111111000010001010010011
+
+Real sensitivity = 0.392467
+time (since beginning): 0.197436
+
+ --- random try number 33 --- 
+seeds:
+1111111111111111111111111000010010100010011
+
+Real sensitivity = 0.392677
+time (since beginning): 1.50717
+
+ --- random try number 175 --- 
+seeds:
+10101100100111111111111111111111111101
+
+Real sensitivity = 0.393269
+time (since beginning): 4.0624
+
+ --- random try number 173 --- 
+seeds:
+11111111111111111111111110001101000011001
+
+Real sensitivity = 0.394638
+time (since beginning): 4.22731
+
+ --- greedy tail (from try 173) --- 
+seeds:
+11111111111111111111111110010101000011001
+
+Real sensitivity = 0.395113
+time (since beginning): 4.33249
+
+ --- local search step 0 (from try 173) --- 
+seeds:
+1111111111111111111111111001001010111
+
+Real sensitivity = 0.406974
+time (since beginning): 4.50889
+
+ --- random try number 209 --- 
+seeds:
+1111111111111111111111111000110110101
+
+Real sensitivity = 0.407183
+time (since beginning): 4.86175
+
+ --- random try number 1232 --- 
+seeds:
+1111111111111111111111111000101011011
+
+Real sensitivity = 0.408222
+time (since beginning): 15.8503
+
+ --- final polish --- 
+
+Best sensitivity is 0.408222
+
+Computed in 15.8503 seconds
+
+Total time (12000 iterations): 136.183 seconds

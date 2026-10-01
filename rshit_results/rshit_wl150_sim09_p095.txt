@@ -1,0 +1,26 @@
+RSHit: window 150, similarity 0.9, hit probability must exceed 0.95, at most 4 shapes
+
+=== Set A: longest m-core, palindromes forbidden, reverse-doubled ===
+weight 31, window 150, similarity 0.9, need hit probability > 0.95, at most 4 designed shapes
+  core  1 (600 tries) -> 0.9470 with 4 shape(s) short
+  core 1 fell short on the probe budget; re-checking with 4000 tries
+  core  1 (4000 tries) -> 0.9480 with 4 shape(s) short
+  hit probability 0.95 is out of reach at weight 31 with 4 shapes (best 0.9480).
+  raise --ms, lower --w1, or widen --span.
+
+=== Set B: palindromic, m=1, fewest shapes ===
+weight 32 down to 15, window 150, similarity 0.9, need hit probability > 0.95
+  k=1 weight 32 (600 tries) -> 0.7001 short
+  k=1 weight 15 (600 tries) -> 0.9999 ok
+  k=1 weight 23 (600 tries) -> 0.9717 ok
+  k=1 weight 27 (600 tries) -> 0.8920 short
+  k=1 weight 25 (600 tries) -> 0.9412 short
+  k=1 weight 24 (600 tries) -> 0.9566 ok
+  bisection says weight 24; re-checking 25..26 with 4000 tries
+  k=1 weight 25 (4000 tries) -> 0.9412 short
+  k=1 weight 26 (4000 tries) -> 0.9208 short
+  1 palindromic shape(s), weight 24
+  final run at weight 24, 1 shape(s), full budget, no early exit
+  hit probability 0.9594 at span <= 40
+    1111101011001100010110100011001101011111  span=40 weight=24 core=5 palindrome=True
+    1 shape(s) in the index

@@ -1,0 +1,63 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 5 --- 
+seeds:
+101110101111010111111111111111111111
+
+Real sensitivity = 0.441357
+time (since beginning): 0.000228
+
+ --- random try number 15 --- 
+seeds:
+11111111111111111111101100101011110101
+
+Real sensitivity = 0.45815
+time (since beginning): 0.002934
+
+ --- random try number 18 --- 
+seeds:
+1111111111111111111001010100110110010100111
+
+Real sensitivity = 0.499228
+time (since beginning): 0.149633
+
+ --- random try number 8 --- 
+seeds:
+1111111111111111111000011010011001110101011
+
+Real sensitivity = 0.49988
+time (since beginning): 0.267347
+
+ --- random try number 12 --- 
+seeds:
+1111111111111111111000011010100110011010111
+
+Real sensitivity = 0.501784
+time (since beginning): 0.296986
+
+ --- random try number 38 --- 
+seeds:
+1111111111111111111000110010110101010011011
+
+Real sensitivity = 0.501894
+time (since beginning): 2.43142
+
+ --- final polish --- 
+
+ --- symmetry: doubled set (2 shapes) --- 
+seeds:
+1111111111111111111000110010110101010011011
+1101100101010110100110001111111111111111111
+
+Real sensitivity = 0.637122
+
+Best sensitivity is 0.637122
+
+Computed in 2.43142 seconds
+
+Total time (12000 iterations): 237.612 seconds

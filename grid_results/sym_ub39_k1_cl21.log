@@ -1,0 +1,132 @@
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 15 --- 
+seeds:
+designed:
+11111111111111111111111111011111
+reversed:
+11111011111111111111111111111111
+
+Real sensitivity = 0.425368
+time (since beginning): 0.000122
+
+ --- random try number 0 --- 
+seeds:
+designed:
+111111111111111111111011010111101100001
+reversed:
+100001101111010110111111111111111111111
+
+Real sensitivity = 0.555796
+time (since beginning): 0.004554
+
+ --- random try number 16 --- 
+seeds:
+designed:
+111111111111111111111000011111110100101
+reversed:
+101001011111110000111111111111111111111
+
+Real sensitivity = 0.556546
+time (since beginning): 0.005275
+
+ --- random try number 6 --- 
+seeds:
+designed:
+111111111111111111111011001101111001001
+reversed:
+100100111101100110111111111111111111111
+
+Real sensitivity = 0.561229
+time (since beginning): 0.006185
+
+ --- random try number 2 --- 
+seeds:
+designed:
+111111111111111111111000111110011001011
+reversed:
+110100110011111000111111111111111111111
+
+Real sensitivity = 0.578823
+time (since beginning): 0.011546
+
+ --- greedy tail (from try 2) --- 
+seeds:
+designed:
+111111111111111111111010011110011001011
+reversed:
+110100110011110010111111111111111111111
+
+Real sensitivity = 0.579634
+time (since beginning): 0.018206
+
+ --- local search step 6 (from try 2) --- 
+seeds:
+designed:
+111111111111111111111010010111000111011
+reversed:
+110111000111010010111111111111111111111
+
+Real sensitivity = 0.58768
+time (since beginning): 0.099692
+
+ --- local search step 10 (from try 2) --- 
+seeds:
+designed:
+111111111111111111111010010111001110011
+reversed:
+110011100111010010111111111111111111111
+
+Real sensitivity = 0.588738
+time (since beginning): 0.121141
+
+ --- local search step 36 (from try 2) --- 
+seeds:
+designed:
+111111111111111111111000010111011010111
+reversed:
+111010110111010000111111111111111111111
+
+Real sensitivity = 0.595487
+time (since beginning): 0.155161
+
+ --- random try number 1832 --- 
+seeds:
+designed:
+111111111111111111111001001101011010111
+reversed:
+111010110101100100111111111111111111111
+
+Real sensitivity = 0.596069
+time (since beginning): 1.46706
+
+ --- random try number 2182 --- 
+seeds:
+designed:
+111111111111111111111000110110110101011
+reversed:
+110101011011011000111111111111111111111
+
+Real sensitivity = 0.598869
+time (since beginning): 1.82016
+
+ --- final polish --- 
+
+ --- designed seeds and their reverses --- 
+designed:
+111111111111111111111000110110110101011
+reversed:
+110101011011011000111111111111111111111
+
+
+Best sensitivity is 0.598869
+
+Computed in 1.82016 seconds
+
+Total time (12000 iterations): 10.19 seconds

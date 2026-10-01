@@ -1,0 +1,20 @@
+k=1 cl=19 ub=63 best=None nSeeds=1 time=1033.0s rc=-15
+k=1 cl=21 ub=63 best=None nSeeds=1 time=5.6s rc=-15
+k=1 cl=23 ub=63 best=None nSeeds=1 time=7.8s rc=-9
+k=1 cl=25 ub=63 best=None nSeeds=1 time=0.1s rc=-9
+k=1 cl=27 ub=63 pending
+k=2 cl=19 ub=63 pending
+k=2 cl=21 ub=63 pending
+k=2 cl=23 ub=63 pending
+k=2 cl=25 ub=63 pending
+k=2 cl=27 ub=63 pending
+k=3 cl=19 ub=63 pending
+k=3 cl=21 ub=63 pending
+k=3 cl=23 ub=63 pending
+k=3 cl=25 ub=63 pending
+k=3 cl=27 ub=63 pending
+k=4 cl=19 ub=63 pending
+k=4 cl=21 ub=63 pending
+k=4 cl=23 ub=63 pending
+k=4 cl=25 ub=63 pending
+k=4 cl=27 ub=63 pending
