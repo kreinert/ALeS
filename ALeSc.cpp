@@ -63,6 +63,11 @@ int original_m = 0;					// resets the m value in adaptive length algorithm
 int original_M = 0;					// resets the M value in adaptive length algorithm
 bool isRegionCreated = false;		// makes sure homologous_array is created only once
 bool require_symmetry = false;		// if true, score and print each seed together with its reverse
+int palindrome_mode = 0;			// 0 unconstrained, 1 every shape palindromic, 2 palindromes forbidden
+bool require_palindrome = false;	// palindrome_mode == 1
+bool forbid_palindrome = false;		// palindrome_mode == 2
+double target_sens = 0.0;			// stop as soon as this sensitivity is reached (0 = maximise)
+int max_tries = 0;					// restart budget; 0 means use SEARCH_TRIES
 const int MAX_FROZEN = 32;
 int nFrozen = 0;					// Hold this many leading seeds while growing k from k-1
 char frozenSeed[MAX_FROZEN][100];
@@ -597,6 +602,31 @@ bool all_seeds_have_weight(char** SEEDS, int NO_SEEDS, int weight)
 	return true;
 }
 
+int count_ones(const char* s)
+{
+	int ones = 0;
+	for (int i = 0; s[i] != '\0'; ++i)
+		if (s[i] == '1')
+			ones++;
+	return ones;
+}
+
+bool seeds_are_reverses(const char* a, const char* b)
+{
+	int n = (int)strlen(a);
+	if (n != (int)strlen(b))
+		return false;
+	for (int i = 0; i < n; ++i)
+		if (a[i] != b[n - 1 - i])
+			return false;
+	return true;
+}
+
+bool is_palindrome(const char* s)
+{
+	return seeds_are_reverses(s, s);
+}
+
 // leftmost start of a run of cl consecutive 1s (-1 if none)
 int find_leftmost_core_start(const char* s)
 {
@@ -630,6 +660,161 @@ bool is_valid_add_position(const char* s, int pos)
 	if (core_lo < 0)
 		return true;
 	return pos <= core_lo || pos >= core_lo + cl;
+}
+
+// A palindrome locks position i to position len-1-i, so matches arrive in pairs and
+// span and weight must share a parity; an odd span spends its centre on the odd match.
+// Nudge len to the nearest legal value inside [w, min(upperBound, N-1)].
+int palindrome_legal_len(int len)
+{
+	if (!require_palindrome || (len % 2) == (w % 2))
+		return len;
+	int hi = upperBound;
+	if (hi > (int)N - 1)
+		hi = (int)N - 1;
+	if (len + 1 <= hi)
+		return len + 1;
+	if (len - 1 >= w)
+		return len - 1;
+	return len;
+}
+
+// Build one palindromic seed carrying the m-core. Either the core fits in the first
+// half and is mirrored into the second, or it straddles the centre and mirrors onto
+// itself; the leftover weight goes in as mirrored pairs. wantLo asks for a core
+// offset in the first half, or -1 to pick one at random.
+bool build_palindrome_seed(char* s, int len, int weight, int wantLo)
+{
+	if (len < weight || len < cl || (len % 2) != (weight % 2))
+		return false;
+	int half = len / 2;
+	for (int j = 0; j < len; ++j)
+		s[j] = '0';
+	s[len] = '\0';
+	if (len % 2)
+		s[half] = '1';
+	if (half >= cl && weight / 2 >= cl) {
+		int slots = half - cl + 1;
+		int lo;
+		if (weight / 2 == cl)
+			lo = 0;				// every pair is spent on the core, so it must start at 0
+		else if (wantLo >= 0)
+			lo = (wantLo < slots) ? wantLo : slots - 1;
+		else
+			lo = ale_rand() % slots;
+		for (int j = lo; j < lo + cl; ++j) {
+			s[j] = '1';
+			s[len - 1 - j] = '1';
+		}
+	}
+	else if (((len - cl) % 2) == 0 && cl <= weight) {
+		int lo = (len - cl) / 2;
+		for (int j = lo; j < lo + cl; ++j)
+			s[j] = '1';
+	}
+	else
+		return false;
+
+	int ones = count_ones(s);
+	if (ones > weight || ((weight - ones) % 2) != 0)
+		return false;
+	int freePos[100], nFree = 0;
+	for (int j = 0; j < half; ++j)
+		if (s[j] == '0')
+			freePos[nFree++] = j;
+	int need = (weight - ones) / 2;
+	if (need > nFree)
+		return false;
+	if (need > 0 && s[0] == '0') {
+		s[0] = '1';
+		s[len - 1] = '1';
+		need--;
+		for (int t = 0; t < nFree; ++t)
+			if (freePos[t] == 0) {
+				freePos[t] = freePos[--nFree];
+				break;
+			}
+	}
+	while (need > 0) {
+		int t = ale_rand() % nFree;
+		int j = freePos[t];
+		s[j] = '1';
+		s[len - 1 - j] = '1';
+		freePos[t] = freePos[--nFree];
+		need--;
+	}
+	return s[0] == '1' && count_ones(s) == weight && has_required_core_length(s);
+}
+
+// Fill seed si palindromically, widening then narrowing the span until one works.
+bool init_palindrome_seed(char** seeds, int* length, int si, int weight, int wantLo = -1)
+{
+	int hi = upperBound;
+	if (hi > (int)N - 1)
+		hi = (int)N - 1;
+	int want = palindrome_legal_len(length[si]);
+	for (int len = want; len <= hi; len += 2) {
+		if (build_palindrome_seed(seeds[si], len, weight, wantLo)) {
+			length[si] = len;
+			return true;
+		}
+	}
+	for (int len = want - 2; len >= weight; len -= 2) {
+		if (build_palindrome_seed(seeds[si], len, weight, wantLo)) {
+			length[si] = len;
+			return true;
+		}
+	}
+	return false;
+}
+
+// Cheap per-seed form of the palindrome rule, for inner loops that touch one seed.
+// Only designed seeds are compared; appended reverses are duplicates by construction.
+bool seed_palindrome_ok(char** seeds, int nDesigned, int si)
+{
+	if (require_palindrome)
+		return is_palindrome(seeds[si]);
+	if (!forbid_palindrome)
+		return true;
+	if (is_palindrome(seeds[si]))
+		return false;
+	for (int j = 0; j < nDesigned; ++j) {
+		if (j == si)
+			continue;
+		if (strcmp(seeds[si], seeds[j]) == 0 || seeds_are_reverses(seeds[si], seeds[j]))
+			return false;
+	}
+	return true;
+}
+
+// Every acceptance gate in the search funnels through here. Pass weight 0 to skip
+// the weight check for moves that only shuffle don't-care positions.
+bool seed_set_is_valid(char** seeds, int nDesigned, int weight)
+{
+	if (!all_seeds_have_required_core_length(seeds, nDesigned))
+		return false;
+	if (weight > 0 && !all_seeds_have_weight(seeds, nDesigned, weight))
+		return false;
+	if (palindrome_mode != 0) {
+		for (int i = 0; i < nDesigned; ++i)
+			if (!seed_palindrome_ok(seeds, nDesigned, i))
+				return false;
+	}
+	return true;
+}
+
+// Write c at pos, and at its mirror when shapes must stay palindromic.
+static inline void seed_set_pair(char* s, int len, int pos, char c)
+{
+	s[pos] = c;
+	if (require_palindrome)
+		s[len - 1 - pos] = c;
+}
+
+// Highest position a mutation may touch; palindromic shapes only move their first half.
+static inline int seed_mutable_hi(int len)
+{
+	return require_palindrome ? len / 2 : len - 1;
 }
 
 static inline void reverse_copy_seed(const char* src, char* dst, int len)
@@ -744,6 +929,10 @@ bool parse_seed_arg(const char* arg, char* dst, int* outLen)
 	if (n > upperBound || n < w)
 		return false;
 	if (!has_required_core_length(dst))
+		return false;
+	if (require_palindrome && !is_palindrome(dst))
+		return false;
+	if (forbid_palindrome && is_palindrome(dst))
 		return false;
 	return true;
 }
@@ -873,42 +1062,46 @@ bool local_swap_outside_core(char** seeds, int* l, int nSeeds)
 		if (si < 0)
 			return false;
 		int len = l[si];
-		if (len < 3)
+		int hi = seed_mutable_hi(len);
+		if (hi < 2)
 			continue;
 		int oldLo = find_leftmost_core_start(seeds[si]);
-		int i = 1 + ale_rand() % (len - 2);
-		int j = 1 + ale_rand() % (len - 2);
+		int i = 1 + ale_rand() % (hi - 1);
+		int j = 1 + ale_rand() % (hi - 1);
 		if (i == j || seeds[si][i] != '1' || seeds[si][j] != '0')
 			continue;
 		if (is_in_leftmost_core(seeds[si], i) || is_in_leftmost_core(seeds[si], j))
 			continue;
 		int before = seed_flank_quality(seeds, l, nSeeds, si);
-		seeds[si][i] = '0';
-		seeds[si][j] = '1';
+		seed_set_pair(seeds[si], len, i, '0');
+		seed_set_pair(seeds[si], len, j, '1');
 		if (!has_required_core_length(seeds[si])
+			|| !seed_palindrome_ok(seeds, nSeeds, si)
 			|| (si < nFrozen && !core_start_unchanged(seeds[si], oldLo))) {
-			seeds[si][i] = '1';
-			seeds[si][j] = '0';
+			seed_set_pair(seeds[si], len, i, '1');
+			seed_set_pair(seeds[si], len, j, '0');
 			continue;
 		}
 		int after = seed_flank_quality(seeds, l, nSeeds, si);
 		if (after > before)
 			return true;
-		seeds[si][i] = '1';
-		seeds[si][j] = '0';
+		seed_set_pair(seeds[si], len, i, '1');
+		seed_set_pair(seeds[si], len, j, '0');
 		fbSi = si;
 		fbI = i;
 		fbJ = j;
 	}
 	if (fbSi < 0)
 		return false;
+	int fbLen = l[fbSi];
 	int oldLo = find_leftmost_core_start(seeds[fbSi]);
-	seeds[fbSi][fbI] = '0';
-	seeds[fbSi][fbJ] = '1';
+	seed_set_pair(seeds[fbSi], fbLen, fbI, '0');
+	seed_set_pair(seeds[fbSi], fbLen, fbJ, '1');
 	if (!has_required_core_length(seeds[fbSi])
+		|| !seed_palindrome_ok(seeds, nSeeds, fbSi)
 		|| (fbSi < nFrozen && !core_start_unchanged(seeds[fbSi], oldLo))) {
-		seeds[fbSi][fbI] = '1';
-		seeds[fbSi][fbJ] = '0';
+		seed_set_pair(seeds[fbSi], fbLen, fbI, '1');
+		seed_set_pair(seeds[fbSi], fbLen, fbJ, '0');
 		return false;
 	}
 	return true;
@@ -949,6 +1142,8 @@ bool inter_seed_swap_outside_core(char** seeds, int* l, int nSeeds)
 // stay outside the new core. Vacated core cells absorb leftover weight.
 bool place_core_keep_flanks(char* seed, int len, int newLo)
 {
+	if (require_palindrome)			// sliding the core would break the mirror
+		return false;
 	if (newLo < 0 || newLo + cl > len)
 		return false;
 	int oldLo = find_leftmost_core_start(seed);
@@ -1063,7 +1258,7 @@ bool apply_local_mutation(char** seeds, int* l, int nSeeds)
 	bool moved = false;
 	for (int m = 0; m < nMoves; ++m) {
 		int choice = ale_rand() % 8;
-		if (choice < 5)
+		if (require_palindrome || choice < 5)
 			moved = local_swap_outside_core(seeds, l, nSeeds) || moved;
 		else if (choice < 7) {
 			int si = pick_mutable_seed(nSeeds);
@@ -1113,18 +1308,20 @@ double greedy_tail_ascent(char** globalBest, int* globalBestLen, int nSeeds, int
 			if (coreLo < 0)
 				continue;
 			int coreHi = coreLo + cl;
-			for (int i = 1; i < len - 1; ++i) {
+			int hi = seed_mutable_hi(len);
+			for (int i = 1; i < hi; ++i) {
 				if (work[si][i] != '1' || (i >= coreLo && i < coreHi))
 					continue;
-				for (int j = 1; j < len - 1; ++j) {
+				for (int j = 1; j < hi; ++j) {
 					if (work[si][j] != '0' || (j >= coreLo && j < coreHi))
 						continue;
-					work[si][i] = '0';
-					work[si][j] = '1';
+					seed_set_pair(work[si], len, i, '0');
+					seed_set_pair(work[si], len, j, '1');
 					if (!has_required_core_length(work[si])
+						|| !seed_palindrome_ok(work, nSeeds, si)
 						|| (si < nFrozen && !core_start_unchanged(work[si], coreLo))) {
-						work[si][i] = '1';
-						work[si][j] = '0';
+						seed_set_pair(work[si], len, i, '1');
+						seed_set_pair(work[si], len, j, '0');
 						continue;
 					}
 					bool usedEst = false;
@@ -1142,8 +1339,8 @@ double greedy_tail_ascent(char** globalBest, int* globalBestLen, int nSeeds, int
 						cout <<"time (since beginning): "<< elapsed << endl << flush;
 					}
 					else {
-						work[si][i] = '1';
-						work[si][j] = '0';
+						seed_set_pair(work[si], len, i, '1');
+						seed_set_pair(work[si], len, j, '0');
 					}
 				}
 			}
@@ -1161,6 +1358,8 @@ double greedy_tail_ascent(char** globalBest, int* globalBestLen, int nSeeds, int
 double greedy_core_slide(char** globalBest, int* globalBestLen, int nSeeds, int N, double p,
 	double bestSens, double t0, int parentTry)
 {
+	if (require_palindrome)			// the core cannot move without breaking the mirror
+		return bestSens;
 	char** work = new char* [nSeeds];
 	int* workLen = new int [nSeeds];
 	for (int i = 0; i < nSeeds; ++i) {
@@ -1196,7 +1395,7 @@ double greedy_core_slide(char** globalBest, int* globalBestLen, int nSeeds, int 
 						work[si][j] = orig[j];
 					continue;
 				}
-				if (!has_required_core_length(work[si]) || !all_seeds_have_weight(work, nSeeds, w)) {
+				if (!seed_set_is_valid(work, nSeeds, w)) {
 					for (int j = 0; j <= len; ++j)
 						work[si][j] = orig[j];
 					continue;
@@ -1270,7 +1469,7 @@ double local_search_from_best(char** globalBest, int* globalBestLen, int nSeeds,
 
 		if (ale_rand() % 5 == 0)
 			MULTIPLE_SWAP1_OVERLAPS_FAST(work, nSeeds);
-		if (!all_seeds_have_required_core_length(work, nSeeds) || !all_seeds_have_weight(work, nSeeds, w)) {
+		if (!seed_set_is_valid(work, nSeeds, w)) {
 			localStale++;
 			continue;
 		}
@@ -1286,7 +1485,7 @@ double local_search_from_best(char** globalBest, int* globalBestLen, int nSeeds,
 			double refinedSens = curSens;
 			bool refinedMode = false;
 			char** refined = findOptimal(work, workLen, nSeeds, N, p, curSens, optTrials, &refinedSens, &refinedMode);
-			if (refinedSens > curSens && all_seeds_have_required_core_length(refined, nSeeds) && all_seeds_have_weight(refined, nSeeds, w)) {
+			if (refinedSens > curSens && seed_set_is_valid(refined, nSeeds, w)) {
 				curSens = refinedSens;
 				sensUsedEstimate = refinedMode;
 				if (refined != work) {
@@ -1353,7 +1552,7 @@ double polish_global_best(char** globalBest, int* globalBestLen, int nSeeds, int
 	bool polishedMode = false;
 	char** optSeeds = findOptimal(globalBest, globalBestLen, nSeeds, N, p, bestSens,
 		FIND_OPTIMAL_POLISH, &polishedSens, &polishedMode);
-	if (polishedSens > bestSens && all_seeds_have_required_core_length(optSeeds, nSeeds) && all_seeds_have_weight(optSeeds, nSeeds, w)) {
+	if (polishedSens > bestSens && seed_set_is_valid(optSeeds, nSeeds, w)) {
 		bestSens = polishedSens;
 		bestMode = polishedMode;
 		if (optSeeds != globalBest) {
@@ -1373,6 +1572,11 @@ double polish_global_best(char** globalBest, int* globalBestLen, int nSeeds, int
 
 void init_seeds_with_core(int weight, int* length, char** seeds, int nSeeds)
 {
+	if (require_palindrome) {
+		for (int i = 0; i < nSeeds; i++)
+			init_palindrome_seed(seeds, length, i, weight);
+		return;
+	}
 	for (int i = 0; i < nSeeds; i++) {
 		for (int j = 0; j < length[i]; j++)
 			seeds[i][j] = '0';
@@ -1397,6 +1601,18 @@ void init_seeds_spread_cores(int weight, int* length, char** seeds, int nSeeds, 
 	static const int perm3[6][3] = {
 		{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}
 	};
+	if (require_palindrome) {
+		for (int i = 0; i < nSeeds; i++) {
+			int half = palindrome_legal_len(length[i]) / 2;
+			int slots = half - cl + 1;
+			if (slots < 1)
+				slots = 1;
+			int bin = (i + perm) % nSeeds;
+			int wantLo = (nSeeds <= 1) ? 0 : (bin * (slots - 1)) / (nSeeds - 1);
+			init_palindrome_seed(seeds, length, i, weight, wantLo);
+		}
+		return;
+	}
 	for (int i = 0; i < nSeeds; i++) {
 		int len = length[i];
 		for (int j = 0; j < len; j++)
@@ -1437,6 +1653,32 @@ void init_added_seed(int weight, int* length, char** seeds, int nSeeds, int si, 
 	int len = length[si];
 	if (len < 1)
 		return;
+	if (require_palindrome) {
+		// Keep the best of a few random palindromes, judged by how well its flanks
+		// complement the seeds already placed.
+		char best[100];
+		int bestLen = 0, bestScore = 0;
+		bool haveBest = false;
+		for (int t = 0; t < 12; ++t) {
+			length[si] = len;
+			if (!init_palindrome_seed(seeds, length, si, weight))
+				continue;
+			int sc = seed_flank_quality(seeds, length, nSeeds, si);
+			if (!haveBest || sc > bestScore) {
+				haveBest = true;
+				bestScore = sc;
+				bestLen = length[si];
+				for (int j = 0; j <= bestLen; ++j)
+					best[j] = seeds[si][j];
+			}
+		}
+		if (haveBest) {
+			length[si] = bestLen;
+			for (int j = 0; j <= bestLen; ++j)
+				seeds[si][j] = best[j];
+		}
+		return;
+	}
 	for (int j = 0; j < len; j++)
 		seeds[si][j] = '0';
 	int slots = len - cl + 1;
@@ -1573,18 +1815,21 @@ static int64_t oc_touch_strings(char** S, int* length, int nT, int s, int r)
 	return t;
 }
 
-static bool oc_swap_allowed(char* seed, int i, int j, int oldLo, bool coreLocked)
+static bool oc_swap_allowed(char** work, int nDesigned, int si, int len, int i, int j,
+	int oldLo, bool coreLocked)
 {
+	char* seed = work[si];
 	if (seed[i] != '1' || seed[j] == '1')
 		return false;
 	if (coreLocked && (is_in_leftmost_core(seed, i) || is_in_leftmost_core(seed, j)))
 		return false;
-	seed[i] = '0';
-	seed[j] = '1';
+	seed_set_pair(seed, len, i, '0');
+	seed_set_pair(seed, len, j, '1');
 	bool ok = has_required_core_length(seed)
+		&& seed_palindrome_ok(work, nDesigned, si)
 		&& (!coreLocked || core_start_unchanged(seed, oldLo));
-	seed[i] = '1';
-	seed[j] = '0';
+	seed_set_pair(seed, len, i, '1');
+	seed_set_pair(seed, len, j, '0');
 	return ok;
 }
 
@@ -1602,6 +1847,9 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 	best_seed=0, k=0, no_swaps=0, i = 0, j = 0, l = 0, tmp = 0;
 	int nDesigned = NO_SEEDS;
 	int nTotal = require_symmetry ? (NO_SEEDS * 2) : NO_SEEDS;
+	// A mirrored swap moves four positions at once, so the incremental sigma update
+	// no longer applies; score those candidates by recomputing the touched pairs.
+	bool rescoreTouched = require_symmetry || require_palindrome;
 	char** work = SEEDS;
 	if (require_symmetry) {
 		tls_oc_exp.ensure(nTotal);
@@ -1642,19 +1890,22 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 			int oldLo = coreLocked ? find_leftmost_core_start(work[cur_seed]) : -1;
 			cur_seed_length = length[cur_seed];
 			int rev = require_symmetry ? (cur_seed + nDesigned) : -1;
-			for (i=1; i<cur_seed_length-1; ++i)
-				for (j=1; j<cur_seed_length-1; ++j)
-					if (oc_swap_allowed(work[cur_seed], i, j, oldLo, coreLocked)) {
-						if (require_symmetry) {
+			int hiPos = seed_mutable_hi(cur_seed_length);
+			for (i=1; i<hiPos; ++i)
+				for (j=1; j<hiPos; ++j)
+					if (oc_swap_allowed(work, nDesigned, cur_seed, cur_seed_length, i, j, oldLo, coreLocked)) {
+						if (rescoreTouched) {
 							int64_t oldTouch = oc_touch_ocm(ocm, strideS, nTotal, cur_seed, rev);
-							work[cur_seed][i] = '0';
-							work[cur_seed][j] = '1';
-							oc_sync_reverse(work, length, cur_seed, nDesigned);
+							seed_set_pair(work[cur_seed], cur_seed_length, i, '0');
+							seed_set_pair(work[cur_seed], cur_seed_length, j, '1');
+							if (require_symmetry)
+								oc_sync_reverse(work, length, cur_seed, nDesigned);
 							int64_t newTouch = oc_touch_strings(work, length, nTotal, cur_seed, rev);
 							int64_t candOC = curOC - oldTouch + newTouch;
-							work[cur_seed][i] = '1';
-							work[cur_seed][j] = '0';
-							oc_sync_reverse(work, length, cur_seed, nDesigned);
+							seed_set_pair(work[cur_seed], cur_seed_length, i, '1');
+							seed_set_pair(work[cur_seed], cur_seed_length, j, '0');
+							if (require_symmetry)
+								oc_sync_reverse(work, length, cur_seed, nDesigned);
 							if (candOC < bestOC) {
 								best_seed = cur_seed;
 								best_i = i;
@@ -1693,10 +1944,11 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 			no_swaps++;
 			if (no_swaps >= weight * nDesigned)
 				found_swap = 0;
-			work[best_seed][best_i] = '0';
-			work[best_seed][best_j] = '1';
-			if (require_symmetry) {
-				oc_sync_reverse(work, length, best_seed, nDesigned);
+			seed_set_pair(work[best_seed], length[best_seed], best_i, '0');
+			seed_set_pair(work[best_seed], length[best_seed], best_j, '1');
+			if (rescoreTouched) {
+				if (require_symmetry)
+					oc_sync_reverse(work, length, best_seed, nDesigned);
 				curOC = oc_fill_from_seeds(work, nTotal, length, om, sigma, ocm, strideS, strideL, maxSigma);
 				bestOC = curOC;
 			}
@@ -1742,8 +1994,8 @@ void makeHomologousRegion(double p, int N){
 	#pragma omp critical(homologous_region)
 	#endif
 	{
-	if(isRegionCreated)
-		return;
+	// Guard rather than return: branching out of an OpenMP structured block is illegal.
+	if(!isRegionCreated){
 	
 	std::random_device rd{}; // use to seed the rng
 	std::mt19937 rng{rd()}; // rng
@@ -1780,6 +2032,7 @@ void makeHomologousRegion(double p, int N){
 		}
 	}
 	isRegionCreated = true;
+	}
 	}
 }
 
@@ -1916,6 +2169,61 @@ inline long long BinReversedToInt (char *s)
 	return(val);
 }
 
+bool warned_dp_too_big = false;		// the "cannot score this set" warning is printed once
+
+// RSHit asks feasibility questions rather than maximising, so once the requested
+// sensitivity is in hand there is nothing to gain from the remaining restarts.
+bool target_reached(double sens)
+{
+	return target_sens > 0.0 && sens >= target_sens;
+}
+
+// Nodes in the DP automaton are compatible prefixes, so the tree grows like
+// 2^(span - weight): the number of don't-care positions, not the span, is what
+// decides whether a set can be scored at all. 56 bytes per node (7 * 8).
+long double dp_worst_case_gb(int span, int weight, int nShapes)
+{
+	int dontCares = span - weight;
+	if (dontCares < 0)
+		dontCares = 0;
+	if (dontCares > 50)
+		dontCares = 50;
+	long double nodes = (long double)nShapes * (long double)span * powl(2.0L, (long double)dontCares);
+	return nodes * 56.0L / (1024.0L * 1024.0L * 1024.0L);
+}
+
+int dp_threads()
+{
+	#if defined(_OPENMP)
+	return omp_get_max_threads();
+	#else
+	return 1;
+	#endif
+}
+
+// Each thread keeps its own automaton, so the budget is shared across them.
+long double dp_budget_gb()
+{
+	long double ram = (long double)totalVirtualMem / (1024.0L * 1024.0L * 1024.0L);
+	int threads = dp_threads();
+	if (threads < 1)
+		threads = 1;
+	return (ram * 0.9L) / (long double)threads;
+}
+
+// Largest span whose worst-case automaton still fits the per-thread budget.
+int max_affordable_span(int weight, int nShapes)
+{
+	long double budget = dp_budget_gb();
+	int best = -1;
+	for (int span = weight; span < 100; ++span) {
+		if (dp_worst_case_gb(span, weight, nShapes) > budget)
+			break;
+		best = span;
+	}
+	return best;
+}
+
 // Computing sensitivity of a set of SEEDS with the given parameters using the dynamic programming of (Li et al., 2004)
 double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate, bool skipSymmetryExpand)
 {
@@ -1966,10 +2274,28 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 		long long NO_BS = MAX_NO_BS;
 		// If memory is not sufficient to calculate real sensitivity, estimated sensitivity is used
 		//7 is multiplied as BS[0].size = 7
-		long double arraySize = ((NO_BS * 7 * 8.0) / (1024 * 1024 * 1024));
-		double totalRam = (totalVirtualMem / (1024 * 1024 *1024) * 1.0);
-		
-		if(((totalRam * 0.9) < arraySize) || ((totalRam * 0.9) < (arraySize * floor(totalRam)))){		// try to filter using less expensive operations
+		long double arraySize = ((long double)NO_BS * 7.0L * 8.0L) / (1024.0L * 1024.0L * 1024.0L);
+
+		if (arraySize > dp_budget_gb()) {
+			// The estimator only covers N <= 128, so for longer windows there is no way
+			// to score this set; say so once instead of silently skipping forever.
+			if (N > 128) {
+				#if defined(_OPENMP)
+				#pragma omp critical(dp_warn)
+				#endif
+				{
+				if (!warned_dp_too_big) {
+					warned_dp_too_big = true;
+					cout << endl << "Cannot score some seed sets: the exact DP needs "
+						<< (double)arraySize << " GB per thread but only "
+						<< (double)dp_budget_gb() << " GB is available, and the estimator "
+						<< "only supports region length <= 128." << endl
+						<< "Those sets are being skipped. The automaton grows like "
+						<< "2^(span - weight), so lower the seed length upper bound." << endl;
+				}
+				}
+				return -1;
+			}
 			makeHomologousRegion(P, N);
 			return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate);
 		}
@@ -2156,6 +2482,8 @@ void assign_seed_lengths(int* length_arr, int nSeeds, int m_val, int M_val)
 		}
 	}
 	qsort(length_arr, nSeeds, sizeof(int), compare);
+	for (int i = 0; i < nSeeds; i++)
+		length_arr[i] = palindrome_legal_len(length_arr[i]);
 	delete[] cnt;
 }
 
@@ -2171,7 +2499,7 @@ void randomize_seed_lengths(int* length_arr, int nSeeds, int m_val, int M_val, i
 	if (lo < weight) lo = weight;
 	if (hi < lo) hi = lo;
 	for (int i = 0; i < nSeeds; i++)
-		length_arr[i] = lo + ale_rand() % (hi - lo + 1);
+		length_arr[i] = palindrome_legal_len(lo + ale_rand() % (hi - lo + 1));
 }
 
 void pick_restart_lengths(int* length_arr, int nSeeds, int weight, int perm)
@@ -2187,9 +2515,9 @@ void pick_restart_lengths(int* length_arr, int nSeeds, int weight, int perm)
 			continue;
 		}
 		if (perm % 2 == 0)
-			length_arr[i] = hi;
+			length_arr[i] = palindrome_legal_len(hi);
 		else
-			length_arr[i] = lo + ale_rand() % (hi - lo + 1);
+			length_arr[i] = palindrome_legal_len(lo + ale_rand() % (hi - lo + 1));
 	}
 }
 
@@ -2289,6 +2617,7 @@ int find_M(char** S, int NO_SEEDS){
 int add_position(char** S, int* l, int NO_SEEDS, long long N){
 	bool flag = true;
 	int seed_no = -1, pos = -1, count = 0;
+	int grow = require_palindrome ? 2 : 1;
 	while(flag){
 		count++;
 		if(count == 40)
@@ -2296,27 +2625,36 @@ int add_position(char** S, int* l, int NO_SEEDS, long long N){
 		seed_no = pick_mutable_seed(NO_SEEDS);
 		if (seed_no < 0)
 			return -1;
-		pos = ale_rand() % (l[seed_no]);
-		if(pos != 0 && pos != l[seed_no] - 1 && l[seed_no] < N
-			&& is_valid_add_position(S[seed_no], pos))
+		int len = l[seed_no];
+		int hiPos = seed_mutable_hi(len);
+		if (hiPos < 2)
+			continue;
+		pos = 1 + ale_rand() % (hiPos - 1);
+		if(len + grow <= N && is_valid_add_position(S[seed_no], pos)
+			&& (!require_palindrome || is_valid_add_position(S[seed_no], len - pos)))
 			flag = false;
 	}
 
 	int length = l[seed_no];
 	//if any seed length is greater than the length upperbound, then ignore that operation
-	if(length + 1 > upperBound)
+	if(length + grow > upperBound)
 		return -1;
-	
-	l[seed_no] = length + 1;
-	char temp[length + 1];
-	for(int i = 0; i < pos; i++)
-		temp[i] = S[seed_no][i];
-	temp[pos] = '0';
-	for(int i = pos + 1; i < length + 1; i++)
-		temp[i] = S[seed_no][i-1];
-	for(int i = 0; i < (int)strlen(temp); i++)
+
+	// Palindromes also take a don't care at the mirror of pos, so the span grows by two
+	// and keeps its parity.
+	char temp[102];
+	int n = 0;
+	for(int i = 0; i < length; i++){
+		if(i == pos)
+			temp[n++] = '0';
+		if(require_palindrome && i == length - pos)
+			temp[n++] = '0';
+		temp[n++] = S[seed_no][i];
+	}
+	temp[n] = '\0';
+	l[seed_no] = n;
+	for(int i = 0; i <= n; i++)
 		S[seed_no][i] = temp[i];
-	S[seed_no][length + 1] = '\0';
 	MULTIPLE_SWAP1_OVERLAPS_FAST(S,NO_SEEDS);
 
 	return seed_no;
@@ -2325,34 +2663,40 @@ int add_position(char** S, int* l, int NO_SEEDS, long long N){
 //remove a don't care at a random position in a random seed - indel optimization (outside m-core)
 int remove_position(char** S, int* l, int NO_SEEDS, long long N){
 	bool flag = true;
-	int seed_no = -1, pos = -1;
+	int seed_no = -1, pos = -1, mirror = -1;
 	int count = 0;
+	int shrink = require_palindrome ? 2 : 1;
 	while(flag){
 		if(count == 40)
 			return -1;
+		count++;
 		seed_no = pick_mutable_seed(NO_SEEDS);
 		if (seed_no < 0)
 			return -1;
-		pos = ale_rand() % (l[seed_no]);
-		if(S[seed_no][pos] == '0'
-			&& pos != 0 && pos != l[seed_no] - 1
-			&& !is_in_leftmost_core(S[seed_no], pos)){
-				flag = false;
-				count = 0;
-			}
-		count++;
+		int len = l[seed_no];
+		int hiPos = seed_mutable_hi(len);
+		if (hiPos < 2 || len - shrink < w)
+			continue;
+		pos = 1 + ale_rand() % (hiPos - 1);
+		mirror = len - 1 - pos;
+		if(S[seed_no][pos] == '0' && !is_in_leftmost_core(S[seed_no], pos)
+			&& (!require_palindrome || pos != mirror))
+			flag = false;
 	}
 
+	// Palindromes drop the don't care at the mirror of pos as well.
 	int length = l[seed_no];
-	l[seed_no] = length - 1;
-	char temp[length - 1];
-	for(int i = 0; i < pos; i++)
-		temp[i] = S[seed_no][i];
-	for(int i = pos + 1; i < length ; i++)
-		temp[i - 1] = S[seed_no][i];
-	for(int i = 0; i < (int)strlen(temp); i++)
+	char temp[102];
+	int n = 0;
+	for(int i = 0; i < length; i++){
+		if(i == pos || (require_palindrome && i == mirror))
+			continue;
+		temp[n++] = S[seed_no][i];
+	}
+	temp[n] = '\0';
+	l[seed_no] = n;
+	for(int i = 0; i <= n; i++)
 		S[seed_no][i] = temp[i];
-	S[seed_no][length - 1] = '\0';
 	MULTIPLE_SWAP1_OVERLAPS_FAST(S,NO_SEEDS);
 
 	return seed_no;
@@ -2414,7 +2758,7 @@ char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, do
 				}
 				continue;
 			}
-			if (!all_seeds_have_required_core_length(tSEEDS, NO_SEEDS)) {
+			if (!seed_set_is_valid(tSEEDS, NO_SEEDS, 0)) {
 				for(int i = 0; i < NO_SEEDS; i++){
 					for(int j = 0 ; j < 100; j++){
 						tSEEDS[i][j] = prevSEEDS[i][j];
@@ -2472,7 +2816,7 @@ char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, do
 				}
 				continue;
 			}
-			if (!all_seeds_have_required_core_length(tSEEDS, NO_SEEDS)) {
+			if (!seed_set_is_valid(tSEEDS, NO_SEEDS, 0)) {
 				for(int i = 0; i < NO_SEEDS; i++){
 					for(int j = 0 ; j < 100; j++){
 						tSEEDS[i][j] = prevSEEDS[i][j];
@@ -2573,6 +2917,11 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 	t[0] = clock()/ 1000000.0;
 	t[1] = t[0];
 	for (int batchStart = 0; batchStart < tries && badMove < STALE_LIMIT; batchStart += PARALLEL_BATCH) {
+		if (target_reached(bestSens)) {
+			cout << endl << "Target sensitivity " << target_sens << " reached; stopping early."
+				<< endl;
+			break;
+		}
 		int batchEnd = batchStart + PARALLEL_BATCH;
 		if (batchEnd > tries)
 			batchEnd = tries;
@@ -2585,6 +2934,10 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 		#pragma omp parallel for schedule(dynamic) reduction(+:batchAvgMin,batchAvgMax) reduction(+:batchValid)
 		#endif
 		for (int k = batchStart; k < batchEnd; k++) {
+			// Another thread in this batch may already have cleared the bar. A torn read
+			// only costs one wasted try, so this needs no lock.
+			if (target_reached(bestSens))
+				continue;
 			ale_srand(baseSeed + (unsigned)k * 7919u
 				#if defined(_OPENMP)
 				+ (unsigned)omp_get_thread_num() * 9973u
@@ -2634,7 +2987,7 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 			// OC on most random inits; skip after crossover so mixed seeds stay intact
 			if (doPerturb || (!doCrossover && (k % 2 == 0)))
 				MULTIPLE_SWAP1_OVERLAPS_FAST(localSeeds, nSeeds);
-			if (!all_seeds_have_required_core_length(localSeeds, nSeeds) || !all_seeds_have_weight(localSeeds, nSeeds, weight)) {
+			if (!seed_set_is_valid(localSeeds, nSeeds, weight)) {
 				continue;
 			}
 
@@ -2688,7 +3041,7 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 			}
 		}
 
-		if (batchImproved) {
+		if (batchImproved && !target_reached(bestSens)) {
 			bestSens = greedy_core_slide(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
 			bestSens = greedy_tail_ascent(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
 			bestSens = local_search_from_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0], batchBestTry);
@@ -2721,13 +3074,15 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 		}
 	}
 
-	if (haveGlobalBest) {
+	if (haveGlobalBest && !target_reached(bestSens)) {
 		int held = nFrozen;
 		nFrozen = 0;
 		bestSens = polish_global_best(globalBest, globalBestLen, nSeeds, N, p, bestSens, t[0]);
 		nFrozen = held;
 		copy_seed_set(seeds, globalBest, length, globalBestLen, nSeeds);
 	}
+	else if (haveGlobalBest)
+		copy_seed_set(seeds, globalBest, length, globalBestLen, nSeeds);
 
 	if (haveGlobalBest && require_symmetry) {
 		cout << endl << " --- designed seeds and their reverses --- " << endl;
@@ -2746,6 +3101,13 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 	}
 	delete[] elite;
 	delete[] eliteLen;
+	if (!haveGlobalBest) {
+		cout << endl << "No seed set could be scored; nothing was found." << endl;
+		if (warned_dp_too_big)
+			cout << "Every candidate exceeded the DP memory budget. Lower the seed length "
+				<< "upper bound, or raise the weight so fewer positions are don't cares."
+				<< endl;
+	}
 	cout << endl << "Best sensitivity is " << bestSens << endl;
 	cout<<endl;
 	cout << "Computed in " << t[1]-t[0] << " seconds" << endl << endl;
@@ -2796,11 +3158,37 @@ void ALeS(char** S){
 		
 	cout<<"Generating "<< k << " seeds of weight "<<w<<" for similarity level "<< p <<" and length of homology region "<< N<<endl<<endl;
 
+	// The DP automaton grows like 2^(span - weight). Refuse up front rather than search
+	// a space whose sets can never be scored.
+	if (N > 128) {
+		int nShapes = require_symmetry ? (k * 2) : k;
+		int affordable = max_affordable_span(w, nShapes);
+		if (affordable < w) {
+			cerr << "Weight " << w << " with " << nShapes << " shapes cannot be scored at "
+				<< "region length " << N << " on this machine !!!" << endl;
+			exit(1);
+		}
+		if (upperBound > affordable) {
+			cerr << "Seed length upper bound " << upperBound << " is out of reach !!!" << endl
+				<< "The DP automaton grows like 2^(span - weight), so weight " << w
+				<< " with " << nShapes << " shapes allows a span of at most "
+				<< affordable << " for region length " << N << " (needs "
+				<< (double)dp_worst_case_gb(upperBound, w, nShapes) << " GB at "
+				<< upperBound << ", budget is " << (double)dp_budget_gb() << " GB)." << endl
+				<< "Re-run with an upper bound of " << affordable << " or less." << endl;
+			exit(1);
+		}
+	}
+
 	int target_k = k;
 	bool successive = (nFrozen == 0 && target_k > 1);
 	int k0 = successive ? 1 : target_k;
 	if (require_symmetry)
 		cout << "Scoring designed seeds together with their reverses; OC uses the doubled set." << endl;
+	if (require_palindrome)
+		cout << "Every shape is a palindrome, so the set is already closed under reversal." << endl;
+	else if (forbid_palindrome)
+		cout << "Rejecting palindromes and mutual reverses, so all shapes stay distinct." << endl;
 	if (successive)
 		cout << "Successive construction: grow from 1 to " << target_k << " seeds." << endl;
 	else if (nFrozen > 0)
@@ -2826,7 +3214,12 @@ void ALeS(char** S){
 			cout << "The program starts computing ..."<<endl;
 			cout << "If you reach a seed with your desired sensitivity you can kill the program ... "<<endl;
 			cout<< endl;
-			RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, kk, SEARCH_TRIES, N, p, 0);
+			double reached = RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, kk, max_tries, N, p, 0);
+			if (target_reached(reached)) {
+				cout << "Target met with " << kk << " seed(s); not growing further." << endl;
+				k = kk;
+				return;
+			}
 		}
 		else {
 			pick_restart_lengths(l, kk, w, 0);
@@ -2851,7 +3244,12 @@ void ALeS(char** S){
 			cout<<endl;
 			cout << "The program starts computing better seeds ..."<<endl;
 			cout << "If you reach a set of seeds with your desired sensitivity you can kill the program ... "<<endl;
-			RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, kk, SEARCH_TRIES, N, p, sensitivity);
+			double reached = RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, kk, max_tries, N, p, sensitivity);
+			if (target_reached(reached)) {
+				cout << "Target met with " << kk << " seed(s); not growing further." << endl;
+				k = kk;
+				return;
+			}
 		}
 		nFrozen = 0;
 	}
@@ -2863,7 +3261,7 @@ void verbose(){
 	
 	cerr << "Five or more arguments required; different number given\n"
 		<< "command line should be:\n"
-		<< "./ALeSc <weight> <numberOfSeeds> <similarity> <lengthOfHomologyRegion> <corelength> [<upperBound>] [<symmetryFlag>] [frozenSeeds...]\n";
+		<< "./ALeSc <weight> <numberOfSeeds> <similarity> <lengthOfHomologyRegion> <corelength> [<upperBound>] [<symmetryFlag>] [<palindromeMode>] [frozenSeeds...]\n";
 	cerr<<" <weight> : Number of match positions in each seed"<<endl;
 	cerr<<" <numberOfSeeds> : Number of seeds"<<endl;
 	cerr<<" <similarity> : Similarity level"<<endl;
@@ -2871,8 +3269,12 @@ void verbose(){
 	cerr<<" <corelength> : Minimum run length of consecutive 1s required in each shape"<<endl;
 	cerr<<" <upperBound> [optional] : Seed length upper bound"<<endl;
 	cerr<<" <symmetryFlag> [optional] : 1 to score each designed seed together with its reverse"<<endl;
+	cerr<<" <palindromeMode> [optional] : 0 unconstrained, 1 every shape palindromic, 2 palindromes forbidden"<<endl;
+	cerr<<"   Mode 1 needs span and weight to share a parity, and makes the symmetry flag redundant."<<endl;
+	cerr<<"   Mode 2 also rejects shapes that are reverses of each other, so a doubled set has 2k distinct shapes."<<endl;
 	cerr<<" [frozenSeeds...] : optional 01-strings; keep these cores fixed and search for the remaining seed(s)"<<endl;
 	cerr<<" With k>1 and no frozen seeds, ALeSc grows from 1 to k, then polishes the full set."<<endl;
+	cerr<<" ALESC_TARGET_SENS [env] : stop as soon as this sensitivity is reached, for feasibility queries"<<endl;
 }
 
 // MAIN 
@@ -2896,6 +3298,27 @@ int main(int argc, char **argv)
 	else
 		upperBound = atoi(argv[6]);  // upper bound of seed lengths
 	require_symmetry = (argc >= 8) ? (atoi(argv[7]) != 0) : false;
+	// argv[8] is the palindrome mode when it is a bare 0/1/2; otherwise the frozen
+	// seeds still start there, so older command lines keep working.
+	int firstFrozen = 8;
+	palindrome_mode = 0;
+	if (argc >= 9 && strlen(argv[8]) == 1 && argv[8][0] >= '0' && argv[8][0] <= '2') {
+		palindrome_mode = argv[8][0] - '0';
+		firstFrozen = 9;
+	}
+	require_palindrome = (palindrome_mode == 1);
+	forbid_palindrome = (palindrome_mode == 2);
+	// Feasibility queries set this so the search stops as soon as the bar is cleared.
+	const char* targetEnv = getenv("ALESC_TARGET_SENS");
+	target_sens = targetEnv ? atof(targetEnv) : 0.0;
+	if (target_sens > 0.0)
+		cout << "Stopping as soon as sensitivity " << target_sens << " is reached." << endl;
+	const char* triesEnv = getenv("ALESC_MAX_TRIES");
+	max_tries = triesEnv ? atoi(triesEnv) : SEARCH_TRIES;
+	if (max_tries < 1)
+		max_tries = SEARCH_TRIES;
+	if (max_tries != SEARCH_TRIES)
+		cout << "Restart budget reduced to " << max_tries << " tries." << endl;
 	nFrozen = 0;
 	
 	l = new int[k];		// seeds' lengths array
@@ -2943,15 +3366,37 @@ int main(int argc, char **argv)
 			cerr<<"length upper bound must be >= seed weight !!!"<<endl;
 			return 1;
 		}
-		if (argc > 8) {
-			int nf = argc - 8;
+		if (require_palindrome) {
+			if (require_symmetry) {
+				cout << "A palindrome is its own reverse; ignoring the symmetry flag." << endl;
+				require_symmetry = false;
+			}
+			int hi = (upperBound < (int)N - 1) ? upperBound : (int)N - 1;
+			bool mirroredCore = (cl <= w / 2) && (2 * cl <= hi);
+			bool centredCore = (((w - cl) % 2) == 0) && (cl <= w);
+			if (!mirroredCore && !centredCore) {
+				cerr << "No palindrome of weight " << w << " can carry a core of " << cl
+					<< " !!!" << endl
+					<< "Either 2*corelength <= weight, or weight - corelength must be even."
+					<< endl;
+				return 1;
+			}
+			if (palindrome_legal_len(hi) < w) {
+				cerr << "No legal palindromic span for weight " << w << " below "
+					<< hi << " !!!" << endl
+					<< "Span and weight must share a parity." << endl;
+				return 1;
+			}
+		}
+		if (argc > firstFrozen) {
+			int nf = argc - firstFrozen;
 			if (nf >= k || nf > MAX_FROZEN) {
 				cerr << "Need 1 to k-1 frozen seeds; got " << nf << " for k=" << k << endl;
 				return 1;
 			}
 			for (int i = 0; i < nf; ++i) {
 				int slen = 0;
-				if (!parse_seed_arg(argv[8 + i], frozenSeed[i], &slen)) {
+				if (!parse_seed_arg(argv[firstFrozen + i], frozenSeed[i], &slen)) {
 					cerr << "Invalid frozen seed " << (i + 1) << " (need weight " << w
 						<< ", core " << cl << ", length in [" << w << "," << upperBound << "])" << endl;
 					return 1;
@@ -2967,7 +3412,7 @@ int main(int argc, char **argv)
 		<<"You probably need more memory to run this program"<<endl;
 	}
 	ttime[1] = clock()/ 1000000.0; 
-	cout << "Total time (" << SEARCH_TRIES << " iterations): " << ttime[1]-ttime[0]<< " seconds" << endl;
+	cout << "Total time (" << max_tries << " iterations): " << ttime[1]-ttime[0]<< " seconds" << endl;
 	return 0;
 }
 
