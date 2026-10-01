@@ -6,55 +6,33 @@ Every shape is a palindrome, so the set is already closed under reversal.
 The program starts computing ...
 If you reach a seed with your desired sensitivity you can kill the program ... 
 
-Parallel restarts enabled (10 threads).
-
- --- random try number 18 --- 
-seeds:
-110110011110000101010101000011110011011
-
-Real sensitivity = 0.988358
-time (since beginning): 23.0581
-
- --- random try number 16 --- 
-seeds:
-110110011101010000111000010101110011011
-
-Real sensitivity = 0.988486
-time (since beginning): 23.6618
+Parallel restarts enabled (2 threads).
 
  --- random try number 10 --- 
 seeds:
-111001110100011010010010110001011100111
+111010110011001010010010100110011010111
 
-Real sensitivity = 0.98875
-time (since beginning): 24.95
+Real sensitivity = 0.98818
+time (since beginning): 1.40262
 
- --- random try number 12 --- 
+ --- random try number 0 --- 
 seeds:
-111110001010011001010100110010100011111
+111100110010100101010101001010011001111
 
-Real sensitivity = 0.989208
-time (since beginning): 31.8728
+Real sensitivity = 0.988855
+time (since beginning): 1.54728
 
- --- random try number 4 --- 
-seeds:
-111110001100101001010100101001100011111
-
-Real sensitivity = 0.989478
-time (since beginning): 32.3757
-
- --- random try number 20 --- 
-seeds:
-111110010101001100010001100101010011111
-
-Real sensitivity = 0.989544
-time (since beginning): 104.042
-
- --- random try number 78 --- 
+ --- random try number 11 --- 
 seeds:
 111110100101000110010011000101001011111
 
 Real sensitivity = 0.989591
-time (since beginning): 304.487
+time (since beginning): 3.67916
 
  --- final polish --- 
+
+Best sensitivity is 0.989591
+
+Computed in 3.67916 seconds
+
+Total time (600 iterations): 493.353 seconds

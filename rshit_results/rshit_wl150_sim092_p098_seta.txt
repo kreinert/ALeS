@@ -1,0 +1,11 @@
+RSHit: window 150, similarity 0.92, hit probability must exceed 0.98, at most 8 shapes
+
+=== Set A: longest m-core, palindromes forbidden, reverse-doubled ===
+weight 31 down to 15, window 150, similarity 0.92, need hit probability > 0.98, at most 8 gapped shapes plus their free reverses
+  weight 31 core  1 (250 tries) -> 0.9828 with 3 designed shape(s) ok
+  weight = 31
+  weight 31 core 16 (250 tries) -> 0.9841 with 4 designed shape(s) ok
+  weight 31 core 24 (250 tries) -> 0.8806 with 8 designed shape(s) short
+  weight 31 core 20 (250 tries) -> 0.9643 with 8 designed shape(s) short
+  weight 31 core 18 (250 tries) -> 0.9804 with 6 designed shape(s) ok
+  weight 31 core 19 (250 tries) -> 0.9754 with 8 designed shape(s) short

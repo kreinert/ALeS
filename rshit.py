@@ -67,80 +67,188 @@ def run(weight, k, sim, wl, cl, span, symmetry, mode, tag, target=None, tries=No
     return probs, shapes, span
 
 
+def core_ceiling(wl, sim, m):
+    """Exact probability that some run of m consecutive matches occurs in the window.
+
+    Every shape with core m needs m matches in a row, so this bounds the hit probability
+    of any set with that core, whatever its weight, span or shape count. The bound is
+    tight: a solid m-mer attains it.
+    """
+    if m <= 1:
+        return 1.0 - (1.0 - sim) ** wl
+    state = [0.0] * m
+    state[0] = 1.0
+    reached = 0.0
+    for _ in range(wl):
+        nxt = [0.0] * m
+        for r in range(m):
+            v = state[r]
+            if not v:
+                continue
+            if r + 1 >= m:
+                reached += v * sim
+            else:
+                nxt[r + 1] += v * sim
+            nxt[0] += v * (1.0 - sim)
+        state = nxt
+    return reached
+
+
+def longest_possible_core(wl, sim, p):
+    """Largest core whose ceiling still exceeds p. Longer cores are impossible."""
+    m = 1
+    while m < wl and core_ceiling(wl, sim, m + 1) > p:
+        m += 1
+    return m
+
+
 def describe(shapes, indexed):
     for s in shapes:
         print("    %s  span=%d weight=%d core=%d palindrome=%s"
               % (s, len(s), s.count("1"), max(len(r) for r in s.split("0")),
                  s == s[::-1]))
+    # Every shape carries the core, so the set only guarantees the shortest of them.
+    if shapes:
+        print("    guaranteed m-core = %d"
+              % min(max(len(r) for r in s.split("0")) for s in shapes))
     print("    %d shape(s) in the index" % indexed)
 
 
 def set_a(args):
-    """Largest core length whose hit probability still exceeds p."""
+    """A long core, but not bought at too high a price in weight.
+
+    Both matter, so neither gets absolute priority. core_cost fixes the exchange rate: one
+    extra core base may cost at most that many units of weight. At the default of 2, core
+    18 at weight 31 comfortably beats core 19 at weight 20, since that single extra base
+    would cost eleven units of weight and roughly 4^11 times more random hits.
+    """
     print("\n=== Set A: longest m-core, palindromes forbidden, reverse-doubled ===")
-    print("weight %d, window %d, similarity %s, need hit probability > %s, "
-          "at most %d designed shapes" % (args.w1, args.wl, args.sim, args.p, args.ms))
+    print("weight %d down to %d, window %d, similarity %s, need hit probability > %s, "
+          "at most %d gapped shapes plus their free reverses"
+          % (args.w1, args.minweight, args.wl, args.sim, args.p, args.ms))
     tag0 = "setA_sim%s_p%s_wl%d" % (str(args.sim).replace(".", ""),
                                     str(args.p).replace(".", ""), args.wl)
 
-    def probe(cl, tries):
-        tag = "%s_cl%d_t%d" % (tag0, cl, tries)
-        probs, shapes, span = run(args.w1, args.ms, args.sim, args.wl, cl, args.span,
+    def probe(weight, cl, tries):
+        tag = "%s_w%d_cl%d_t%d" % (tag0, weight, cl, tries)
+        probs, shapes, span = run(weight, args.ms, args.sim, args.wl, cl, args.span,
                                   True, MODE_FORBID_PALINDROME, tag,
                                   target=args.p, tries=tries)
         top = probs[-1] if probs else -1.0
-        print("  core %2d (%d tries) -> %.4f with %d shape(s) %s"
-              % (cl, tries, top, len(probs), "ok" if top > args.p else "short"))
+        print("  weight %2d core %2d (%d tries) -> %.4f with %d designed shape(s) %s"
+              % (weight, cl, tries, top, len(probs),
+                 "ok" if top > args.p else "short"))
         sys.stdout.flush()
         return probs, shapes, span
 
     cache = {}
 
-    def feasible(cl):
-        if cl not in cache:
-            cache[cl] = probe(cl, args.probe_tries)
-        probs = cache[cl][0]
+    def feasible(weight, cl):
+        if (weight, cl) not in cache:
+            cache[(weight, cl)] = probe(weight, cl, args.probe_tries)
+        probs = cache[(weight, cl)][0]
         return bool(probs) and probs[-1] > args.p
 
-    if not feasible(1):
-        # The entry condition decides whether Set A exists at all, so never settle it on
-        # the cheap budget.
-        print("  core 1 fell short on the probe budget; re-checking with %d tries"
-              % args.confirm_tries)
-        cache[1] = probe(1, args.confirm_tries)
-        if not feasible(1):
-            print("  hit probability %s is out of reach at weight %d with %d shapes "
-                  "(best %.4f)." % (args.p, args.w1, args.ms, cache[1][0][-1]))
-            print("  raise --ms, lower --w1, or widen --span.")
-            return None
-
-    lo, hi = 1, args.w1          # lo is known feasible, hi is unknown
-    while lo < hi:
-        mid = (lo + hi + 1) // 2
-        if feasible(mid):
-            lo = mid
-        else:
-            hi = mid - 1
-
-    # A short probe that failed may simply not have searched hard enough, so re-check the
-    # cores just above the boundary with a real budget before settling.
-    print("  bisection says core %d; re-checking %d..%d with %d tries"
-          % (lo, lo + 1, min(lo + args.guard, args.w1), args.confirm_tries))
-    for cl in range(lo + 1, min(lo + args.guard, args.w1) + 1):
-        probs, shapes, span = probe(cl, args.confirm_tries)
+    def confirm(weight, cl):
+        probs, shapes, span = probe(weight, cl, args.confirm_tries)
         if probs and probs[-1] > args.p:
-            lo = cl
-            cache[cl] = (probs, shapes, span)
+            cache[(weight, cl)] = (probs, shapes, span)
+            return True
+        return False
 
-    probs, shapes, span = cache[lo]
+    # Step 1: the weight, judged at core 1 since that is the easiest core and so decides
+    # whether a weight is usable at all.
+    if feasible(args.w1, 1):
+        weight = args.w1
+    else:
+        print("  weight %d falls short; re-checking with %d tries before giving it up"
+              % (args.w1, args.confirm_tries))
+        if confirm(args.w1, 1):
+            weight = args.w1
+        else:
+            if not feasible(args.minweight, 1):
+                print("  %s is out of reach even at weight %d with %d shapes."
+                      % (args.p, args.minweight, args.ms))
+                return None
+            lo, hi = args.minweight, args.w1 - 1
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                if feasible(mid, 1):
+                    lo = mid
+                else:
+                    hi = mid - 1
+            print("  bisection says weight %d; re-checking %d..%d with %d tries"
+                  % (lo, lo + 1, min(lo + args.guard, args.w1), args.confirm_tries))
+            for wv in range(lo + 1, min(lo + args.guard, args.w1) + 1):
+                if confirm(wv, 1):
+                    lo = wv
+            weight = lo
+    print("  weight = %d" % weight)
+
+    # Cores past the exact ceiling are impossible rather than merely hard, so cap there
+    # instead of paying for probes that cannot succeed.
+    ceiling = longest_possible_core(args.wl, args.sim, args.p)
+    print("  core ceiling at this window and similarity allows at most %d" % ceiling)
+
+    def longest_core_at(w):
+        """Longest core weight w can carry, capped by the exact ceiling."""
+        cap = min(w, ceiling)
+        lo, hi = 1, cap
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if feasible(w, mid):
+                lo = mid
+            else:
+                hi = mid - 1
+        # A short probe that failed may simply not have searched hard enough, so re-check
+        # the cores just above the boundary with a real budget before settling.
+        for cl in range(lo + 1, min(lo + args.guard, cap) + 1):
+            if confirm(w, cl):
+                lo = cl
+        return lo
+
+    # Step 2: balance core against weight. A longer core is worth having, but not at any
+    # price: core_cost says how many units of weight one extra core base may cost, so
+    # core 18 at weight 31 beats core 19 at weight 20 by a wide margin.
+    top = weight
+    core = longest_core_at(top)
+
+    def score(w, cl):
+        return cl - (top - w) / float(args.core_cost)
+
+    best = (score(top, core), top, core)
+    print("  weight %d carries core %d (score %.2f)" % (top, core, best[0]))
+
+    # Descend only while a lighter shape could still win. The core can never exceed the
+    # ceiling, so once even a ceiling-length core cannot beat the incumbent, stop.
+    w = top - 1
+    while w >= args.minweight:
+        bound = ceiling - (top - w) / float(args.core_cost)
+        if bound <= best[0]:
+            print("  weight %d could at best score %.2f, so no lighter shape can beat "
+                  "%.2f; stopping the descent" % (w, bound, best[0]))
+            break
+        if feasible(w, 1):
+            cl = longest_core_at(w)
+            sc = score(w, cl)
+            print("  weight %d carries core %d (score %.2f)" % (w, cl, sc))
+            if sc > best[0]:
+                best = (sc, w, cl)
+        w -= 1
+
+    _, weight, lo = best
+    probs, shapes, span = cache[(weight, lo)]
     kmin = len(probs)
-    print("  longest core = %d, needs %d designed shape(s)" % (lo, kmin))
+    print("  balanced choice: core %d at weight %d, needs %d designed shape(s)"
+          % (lo, weight, kmin))
     print("  final run at core %d, %d shape(s), full budget, no early exit" % (lo, kmin))
-    probs, shapes, span = run(args.w1, kmin, args.sim, args.wl, lo, span, True,
-                              MODE_FORBID_PALINDROME, "%s_cl%d_final" % (tag0, lo), tries=args.confirm_tries)
+    probs, shapes, span = run(weight, kmin, args.sim, args.wl, lo, span, True,
+                              MODE_FORBID_PALINDROME,
+                              "%s_w%d_cl%d_final" % (tag0, weight, lo),
+                              tries=args.confirm_tries)
     print("  hit probability %.4f at span <= %d" % (probs[-1] if probs else -1, span))
     describe(shapes, 2 * len(shapes))
-    return lo, kmin, probs[-1] if probs else None, shapes
+    return weight, lo, kmin, probs[-1] if probs else None, shapes
 
 
 def set_b(args):
@@ -220,6 +328,8 @@ def main():
     ap.add_argument("--w1", type=int, default=31, help="weight of the m-core set")
     ap.add_argument("--w2", type=int, default=32, help="starting weight of the palindromic set")
     ap.add_argument("--minweight", type=int, default=15)
+    ap.add_argument("--core-cost", type=float, default=2.0,
+                    help="units of weight one extra core base may cost (Set A)")
     ap.add_argument("--span", type=int, default=40, help="seed length upper bound to try")
     ap.add_argument("--probe-tries", type=int, default=600,
                     help="restart budget for feasibility probes")

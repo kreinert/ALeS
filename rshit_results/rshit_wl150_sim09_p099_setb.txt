@@ -6,3 +6,5 @@ weight 32 down to 15, window 150, similarity 0.9, need hit probability > 0.99
   k=1 weight 15 (600 tries) -> 0.9999 ok
   k=1 weight 23 (600 tries) -> 0.9727 short
   k=1 weight 19 (600 tries) -> 0.9968 ok
+  k=1 weight 21 (600 tries) -> 0.9896 short
+  k=1 weight 20 (600 tries) -> 0.9936 ok

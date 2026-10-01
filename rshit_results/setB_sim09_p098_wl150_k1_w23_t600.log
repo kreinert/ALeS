@@ -1,0 +1,52 @@
+Stopping as soon as sensitivity 0.98 is reached.
+Restart budget reduced to 600 tries.
+Generating 1 seeds of weight 23 for similarity level 0.9 and length of homology region 150
+
+Every shape is a palindrome, so the set is already closed under reversal.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (2 threads).
+
+ --- random try number 10 --- 
+seeds:
+111110011010100011010110001010110011111
+
+Real sensitivity = 0.971465
+time (since beginning): 0.356755
+
+ --- random try number 0 --- 
+seeds:
+111101110100011010010010110001011101111
+
+Real sensitivity = 0.97154
+time (since beginning): 0.359992
+
+ --- random try number 18 --- 
+seeds:
+111100111001010110010011010100111001111
+
+Real sensitivity = 0.971723
+time (since beginning): 2.05415
+
+ --- local search step 17 (from try 18) --- 
+seeds:
+111110101100100011010110001001101011111
+
+Real sensitivity = 0.972179
+time (since beginning): 11.0358
+
+ --- random try number 54 --- 
+seeds:
+111111001010011001010100110010100111111
+
+Real sensitivity = 0.972749
+time (since beginning): 16.7447
+
+ --- final polish --- 
+
+Best sensitivity is 0.972749
+
+Computed in 16.7447 seconds
+
+Total time (600 iterations): 106.792 seconds

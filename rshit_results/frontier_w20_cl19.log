@@ -1,0 +1,47 @@
+Stopping as soon as sensitivity 0.98 is reached.
+Restart budget reduced to 250 tries.
+Generating 8 seeds of weight 20 for similarity level 0.92 and length of homology region 150
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+Rejecting palindromes and mutual reverses, so all shapes stay distinct.
+Successive construction: grow from 1 to 8 seeds.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (2 threads).
+
+ --- random try number 10 --- 
+seeds:
+designed:
+11111111111111111110000000000000000001
+reversed:
+10000000000000000001111111111111111111
+
+Real sensitivity = 0.979953
+time (since beginning): 8.64345
+
+ --- random try number 19 --- 
+seeds:
+designed:
+111111111111111111100000000001
+reversed:
+100000000001111111111111111111
+
+Real sensitivity = 0.98021
+time (since beginning): 53.9102
+
+Target sensitivity 0.98 reached; stopping early.
+
+ --- designed seeds and their reverses --- 
+designed:
+111111111111111111100000000001
+reversed:
+100000000001111111111111111111
+
+
+Best sensitivity is 0.98021
+
+Computed in 53.9102 seconds
+
+Target met with 1 seed(s); not growing further.
+Total time (250 iterations): 54.3483 seconds

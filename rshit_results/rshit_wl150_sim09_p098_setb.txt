@@ -1,0 +1,13 @@
+RSHit: window 150, similarity 0.9, hit probability must exceed 0.98, at most 4 shapes
+
+=== Set B: palindromic, m=1, fewest shapes ===
+weight 32 down to 15, window 150, similarity 0.9, need hit probability > 0.98
+  k=1 weight 32 (600 tries) -> 0.6993 short
+  k=1 weight 15 (600 tries) -> 0.9999 ok
+  k=1 weight 23 (600 tries) -> 0.9727 short
+  k=1 weight 19 (600 tries) -> 0.9968 ok
+  k=1 weight 21 (600 tries) -> 0.9886 ok
+  k=1 weight 22 (600 tries) -> 0.9805 ok
+  bisection says weight 22; re-checking 23..24 with 4000 tries
+  k=1 weight 23 (4000 tries) -> 0.9727 short
+  k=1 weight 24 (4000 tries) -> 0.9594 short

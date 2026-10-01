@@ -1,0 +1,3 @@
+Frontier at wl=150, sim=0.92, p>0.98, at most 8 gapped shapes plus free reverses
+core 19 has an exact ceiling of 0.9805, so this is the last reachable core
+  weight 20 core 19 -> 0.9802 with 1 designed shape(s) ok
