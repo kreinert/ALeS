@@ -31,6 +31,9 @@ MODE_FORBID_PALINDROME = "2"
 MODE_REQUIRE_PALINDROME = "1"
 
 OUT_OF_REACH = re.compile(r"Re-run with an upper bound of (\d+)")
+BEST_SENS = re.compile(
+    r"Best sensitivity is\s+(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)")
+RUN_TIMEOUT = 3600
 
 
 def run(weight, k, sim, wl, cl, span, symmetry, mode, tag, target=None, tries=None):
@@ -50,16 +53,26 @@ def run(weight, k, sim, wl, cl, span, symmetry, mode, tag, target=None, tries=No
     while True:
         cmd = [BIN, str(weight), str(k), str(sim), str(wl), str(cl), str(span),
                "1" if symmetry else "0", mode]
-        with open(log, "w") as fh:
-            subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, check=False, env=env)
-        txt = open(log).read()
+        try:
+            with open(log, "w") as fh:
+                proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT,
+                                      check=False, env=env, timeout=RUN_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            sys.stderr.write("ALeSc timed out after %d s (log: %s)\n" % (RUN_TIMEOUT, log))
+            raise SystemExit(1)
+        with open(log) as fh:
+            txt = fh.read()
         hit = OUT_OF_REACH.search(txt)
         if hit:
             # The DP automaton grows like 2^(span-weight); retry at the span it allows.
             span = int(hit.group(1))
             continue
+        if proc.returncode != 0:
+            sys.stderr.write("ALeSc failed with exit code %d (log: %s)\n%s\n"
+                             % (proc.returncode, log, txt[-2000:]))
+            raise SystemExit(1)
         break
-    probs = [float(x) for x in re.findall(r"Best sensitivity is ([0-9.]+)", txt)]
+    probs = [float(x) for x in BEST_SENS.findall(txt)]
     blocks = re.findall(r"designed:\n((?:[01]+\n)+)", txt)
     if not blocks:
         blocks = re.findall(r"seeds:\n((?:[01]+\n)+)", txt)
@@ -156,31 +169,32 @@ def set_a(args):
             return True
         return False
 
-    # Step 1: the weight, judged at core 1 since that is the easiest core and so decides
-    # whether a weight is usable at all.
-    if feasible(args.w1, 1):
+    # Step 1: the weight, judged at the starting core. Core 1 is the easiest, but if the
+    # caller already wants cores of at least start_core there is no point testing below it.
+    start_core = max(1, args.start_core)
+    if feasible(args.w1, start_core):
         weight = args.w1
     else:
-        print("  weight %d falls short; re-checking with %d tries before giving it up"
-              % (args.w1, args.confirm_tries))
-        if confirm(args.w1, 1):
+        print("  weight %d falls short at core %d; re-checking with %d tries before giving it up"
+              % (args.w1, start_core, args.confirm_tries))
+        if confirm(args.w1, start_core):
             weight = args.w1
         else:
-            if not feasible(args.minweight, 1):
-                print("  %s is out of reach even at weight %d with %d shapes."
-                      % (args.p, args.minweight, args.ms))
+            if not feasible(args.minweight, start_core):
+                print("  %s is out of reach even at weight %d with %d shapes and core %d."
+                      % (args.p, args.minweight, args.ms, start_core))
                 return None
             lo, hi = args.minweight, args.w1 - 1
             while lo < hi:
                 mid = (lo + hi + 1) // 2
-                if feasible(mid, 1):
+                if feasible(mid, start_core):
                     lo = mid
                 else:
                     hi = mid - 1
             print("  bisection says weight %d; re-checking %d..%d with %d tries"
                   % (lo, lo + 1, min(lo + args.guard, args.w1), args.confirm_tries))
             for wv in range(lo + 1, min(lo + args.guard, args.w1) + 1):
-                if confirm(wv, 1):
+                if confirm(wv, start_core):
                     lo = wv
             weight = lo
     print("  weight = %d" % weight)
@@ -191,9 +205,9 @@ def set_a(args):
     print("  core ceiling at this window and similarity allows at most %d" % ceiling)
 
     def longest_core_at(w):
-        """Longest core weight w can carry, capped by the exact ceiling."""
+        """Longest core weight w can carry, from start_core up to the exact ceiling."""
         cap = min(w, ceiling)
-        lo, hi = 1, cap
+        lo, hi = min(start_core, cap), cap
         while lo < hi:
             mid = (lo + hi + 1) // 2
             if feasible(w, mid):
@@ -206,6 +220,20 @@ def set_a(args):
             if confirm(w, cl):
                 lo = cl
         return lo
+
+    def extend_core(w, known):
+        """Push the core past `known`, which a heavier shape already carried.
+
+        Feasibility is monotone in weight and in core, so a lighter shape carries every
+        core the heavier one did and there is nothing to learn by retesting them. The
+        search therefore resumes at the first core that failed above and walks up, which
+        costs a probe or two instead of a fresh bisection over the whole range.
+        """
+        cap = min(w, ceiling)
+        cl = known
+        while cl < cap and (feasible(w, cl + 1) or confirm(w, cl + 1)):
+            cl += 1
+        return cl
 
     # Step 2: balance core against weight. A longer core is worth having, but not at any
     # price: core_cost says how many units of weight one extra core base may cost, so
@@ -221,6 +249,8 @@ def set_a(args):
 
     # Descend only while a lighter shape could still win. The core can never exceed the
     # ceiling, so once even a ceiling-length core cannot beat the incumbent, stop.
+    # A lighter shape inherits the core already achieved, so only longer cores are tried.
+    known = core
     w = top - 1
     while w >= args.minweight:
         bound = ceiling - (top - w) / float(args.core_cost)
@@ -228,12 +258,19 @@ def set_a(args):
             print("  weight %d could at best score %.2f, so no lighter shape can beat "
                   "%.2f; stopping the descent" % (w, bound, best[0]))
             break
-        if feasible(w, 1):
-            cl = longest_core_at(w)
+        if known >= ceiling:
+            print("  core %d is already the ceiling; no lighter shape can do better"
+                  % known)
+            break
+        cl = extend_core(w, known)
+        if cl > known:
+            known = cl
             sc = score(w, cl)
-            print("  weight %d carries core %d (score %.2f)" % (w, cl, sc))
+            print("  weight %d reaches core %d (score %.2f)" % (w, cl, sc))
             if sc > best[0]:
                 best = (sc, w, cl)
+        else:
+            print("  weight %d does not get past core %d" % (w, known))
         w -= 1
 
     _, weight, lo = best
@@ -330,7 +367,9 @@ def main():
     ap.add_argument("--minweight", type=int, default=15)
     ap.add_argument("--core-cost", type=float, default=2.0,
                     help="units of weight one extra core base may cost (Set A)")
-    ap.add_argument("--span", type=int, default=40, help="seed length upper bound to try")
+    ap.add_argument("--start-core", type=int, default=1,
+                    help="smallest m-core Set A will consider (skip cores below this)")
+    ap.add_argument("--span", type=int, default=63, help="seed length upper bound to try")
     ap.add_argument("--probe-tries", type=int, default=600,
                     help="restart budget for feasibility probes")
     ap.add_argument("--confirm-tries", type=int, default=4000,

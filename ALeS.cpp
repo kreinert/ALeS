@@ -20,6 +20,22 @@
 
 using namespace std;
 
+// Seed strings live in fixed buffers. Region length is capped at 127, so a seed
+// (which is shorter than the region) and its terminator fit in 128 bytes.
+static const int MAX_SEED_LEN = 127;
+static const int MAX_SEED_BUF = MAX_SEED_LEN + 1;
+
+// Overlap complexity sums powers of the overlap count. Saturation keeps the int64
+// accumulator (and the shift) well defined for long seeds; spans up to 42 are exact.
+static inline int64_t oc_pow2(int s)
+{
+	if (s <= 0)
+		return 1;
+	if (s >= 42)
+		return (int64_t)1 << 42;
+	return (int64_t)1 << s;
+}
+
 int* l;								// Seeds lengths
 int k; 								// Number of seeds
 int N;								// Length of the random region R
@@ -430,7 +446,7 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 							OM[i][j][k][l] = -1;
 			}
 			for (k=0; k<length[i]+length[j]-1; ++k)
-				OCM[i][j] += (1 << (int)sigma[i][j][k]);
+				OCM[i][j] += oc_pow2((int)sigma[i][j][k]);
 			curOC += OCM[i][j];
 		}
 	}
@@ -455,7 +471,7 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 							// compute the change in OC; the new sigma is in tempSigma
 							k_cur_seed_OC = 0;
 							for (l=0; l<tempSigmaLength; ++l)
-								k_cur_seed_OC += (1 << (int)tempSigma[l]);
+								k_cur_seed_OC += oc_pow2((int)tempSigma[l]);
 							curOC -= (k<cur_seed) ? OCM[k][cur_seed] : OCM[cur_seed][k];
 							curOC += k_cur_seed_OC;
 						}
@@ -491,7 +507,7 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 				k_best_seed_OC = 0;
 				for (l=0; l<length[k]+length[best_seed]-1; ++l) {
 					tmp = (k < best_seed) ? (int)sigma[k][best_seed][l] : (int)sigma[best_seed][k][l];
-					k_best_seed_OC += (1 << tmp);
+					k_best_seed_OC += oc_pow2(tmp);
 				}
 				i = (k < best_seed) ? k : best_seed;
 				j = (k > best_seed) ? k : best_seed;
@@ -630,8 +646,9 @@ double ESTIMATE_SENSITIVITY(char** SEEDS, int NO_SEEDS, long long N)
 				one_seed = lower;
 			}
 			else{
-				lower = std::stoull(std::string(&SEEDS[i][0], &SEEDS[i][63]), 0, 2);
-				upper = std::stoull(std::string(&SEEDS[i][64], &SEEDS[i][N]), 0, 2);
+				size_t sl = strlen(SEEDS[i]);
+				lower = std::stoull(std::string(&SEEDS[i][0], &SEEDS[i][64]), 0, 2);
+				upper = std::stoull(std::string(&SEEDS[i][64], &SEEDS[i][sl]), 0, 2);
 				one_seed = upper;
 				one_seed = one_seed<<64;
 				one_seed = one_seed|lower;
@@ -662,10 +679,10 @@ double ESTIMATE_SENSITIVITY(char** SEEDS, int NO_SEEDS, long long N)
 }
 
 // converts the reversed of the binary string s into integer
-inline long long BinReversedToInt (char *s)	
+inline unsigned long long BinReversedToInt (char *s)	
 {										// works also with * instead of 0
-	long long val=0;
-	long long l = strlen(s), i=0, temp=1;
+	unsigned long long val=0;
+	unsigned long long l = strlen(s), i=0, temp=1;
 	for(i=0; i<=l-1; i++)
 	{
 		if (s[i] == '1') val += temp;
@@ -678,8 +695,9 @@ inline long long BinReversedToInt (char *s)
 double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem)
 {
 	long long i=0, j=0, b=0, pos=0, MAX_L=0, level=0, prev_level_start=0, prev_level_end=0, compatible=0,
-	hit=0, suffix_link=0, zero_link=0, new_i=0, tmp=0;
-	long long b_zero=0, b_one=0, MAX_NO_BS;
+	hit=0, suffix_link=0, zero_link=0, new_i=0;
+	unsigned long long b_zero=0, b_one=0;
+	long long MAX_NO_BS;
 	double f0=0, f1=0, result = 0;
 	long long **BS;
 	
@@ -689,8 +707,16 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 		seed_length[i] = strlen(SEEDS[i]);
 		if (MAX_L < seed_length[i]) MAX_L = seed_length[i];
 	}
+	// The exact automaton keeps reversed prefixes in 64-bit integers. A seed longer
+	// than 63 bits would touch the sign bit, so send those to the estimator instead.
+	if (MAX_L > 63) {
+		makeHomologousRegion(P, N);
+		isRegionCreated = true;
+		delete[] seed_length;
+		return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N);
+	}
 	// compute the integer values of the reversed seeds INTeger REVersed SEEDS
-	long long* INT_REV_SEEDS = new long long[NO_SEEDS];
+	unsigned long long* INT_REV_SEEDS = new unsigned long long[NO_SEEDS];
 	for (i=0; i<=NO_SEEDS-1; i++)
 		INT_REV_SEEDS[i] = BinReversedToInt(SEEDS[i]); // !!! this works like * = 0
 	// create the tree of BS --- 1..NO_BS-1 *********************************************************
@@ -703,27 +729,31 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 	// BS[i][5] = its level = the length of the string
 	// BS[i][6] = the longest prefix of 0b which reversed means the longest suffix followed by a 0
 	try{
-		MAX_NO_BS = NO_SEEDS;
+		// Count the automaton nodes in floating point: a 64-mer can need about 2^64
+		// nodes, which would overflow the integer before the memory check runs.
+		long double maxNodesL = (long double)NO_SEEDS;
 		for (i=0; i<=NO_SEEDS-1; i++) {		// compute maximum possible no of b's
-			tmp = 1;
-			for (j=strlen(SEEDS[i])-1; j>=0; j--) {
-				if (SEEDS[i][j] != '1') tmp *= 2;
-				MAX_NO_BS += tmp;        // add previous value if 1 in seed or double (tmp *= 2 above) if a * in seed
+			long double tmpL = 1.0L;
+			for (j=seed_length[i]-1; j>=0; j--) {
+				if (SEEDS[i][j] != '1') tmpL *= 2.0L;
+				maxNodesL += tmpL;        // add previous value if 1 in seed or double if a * in seed
 			}
 		}
-		long long NO_BS = MAX_NO_BS;
 		// If memory is not sufficient to calculate real sensitivity, estimated sensitivity is used
 		//7 is multiplied as BS[0].size = 7
-		long double arraySize = ((NO_BS * 7 * 8.0) / (1024 * 1024 * 1024));
+		long double arraySize = ((maxNodesL * 7.0L * 8.0L) / (1024.0L * 1024.0L * 1024.0L));
 		double totalRam = (totalVirtualMem / (1024 * 1024 *1024) * 1.0);
 		
-		if(((totalRam * 0.9) < arraySize) || ((totalRam * 0.9) < (arraySize * floor(totalRam)))){		// try to filter using less expensive operations
+		if(((totalRam * 0.9) < arraySize) || ((totalRam * 0.9) < (arraySize * floor(totalRam)))
+			|| maxNodesL > 9.0e18L){		// try to filter using less expensive operations
 			makeHomologousRegion(P, N);
 			isRegionCreated = true;
-			MAX_NO_BS = NO_BS = 0;
+			MAX_NO_BS = 0;
 			delete[] seed_length; delete[] INT_REV_SEEDS;
 			return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N);
 		}
+		MAX_NO_BS = (long long)maxNodesL;
+		long long NO_BS = MAX_NO_BS;
 		// bound for computing sensitivity (not allocate more than 120GB)
 		BS = new long long *[NO_BS];
 		for (i=0; i<=NO_BS-1; i++)	{
@@ -749,7 +779,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 			for (i = prev_level_start; i <= prev_level_end; i++)
 				if (BS[i][4] != 1) { // not a hit
 					b = BS[i][0]; // integer value
-					b_zero = 2 * b; // try b0
+					b_zero = 2ULL * (unsigned long long)b; // try b0
 					compatible = 0; hit = 0;
 					for (j=0; j<=NO_SEEDS-1; j++) 	// check long enough seeds to seee if b0 is compat/hit
 						if (seed_length[j] >= level)
@@ -760,7 +790,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 							}
 					if (compatible) {
 						BS[i][1] = pos;
-						BS[pos][0] = 2 * b;
+						BS[pos][0] = (long long)(2ULL * (unsigned long long)b);
 						BS[pos][4] = hit; // hit = 1 if it is hit by a seed
 						BS[pos][5] = level;
 						suffix_link = BS[i][3];
@@ -774,7 +804,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 						}
 						pos++;
 					}
-					b_one = 2 * b + 1; // try b1
+					b_one = 2ULL * (unsigned long long)b + 1ULL; // try b1
 					compatible = 0; hit = 0;
 					for (j=0; j<=NO_SEEDS-1; j++) 	// check all long enough seed to seee if b0 is compat/hit
 						if (seed_length[j] >= level)
@@ -785,7 +815,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 							}
 					if (compatible) {
 						BS[i][2] = pos;
-						BS[pos][0] = 2 * b + 1;
+						BS[pos][0] = (long long)(2ULL * (unsigned long long)b + 1ULL);
 						BS[pos][4] = hit; // hit = 1 if it is hit by a seed
 						BS[pos][5] = level;
 						suffix_link = BS[i][3];
@@ -884,8 +914,8 @@ int compare (const void * a, const void * b)
 // Heuristic algorithm for generating lengths of the seeds given minimum length m and maximum length M
 void MAKE_L(int m, int M)
 {
-	int* cnt = new int[100]; // cnt has the number of each l[i]
-	for (int i=0;i<100;i++){
+	int* cnt = new int[MAX_SEED_BUF]; // cnt has the number of each l[i]
+	for (int i=0;i<MAX_SEED_BUF;i++){
 		cnt[i] = 0;
 	}
 	int temp = M;
@@ -1021,16 +1051,17 @@ int add_position(char** S, int* l, int NO_SEEDS, long long N){
 	if(length + 1 > upperBound)
 		return -1;
 	
-	l[seed_no] = length + 1;
-	char temp[length + 1];
-	for(int i = 0; i < pos; i++)
-		temp[i] = S[seed_no][i];
-	temp[pos] = '0';
-	for(int i = pos + 1; i < length + 1; i++)
-		temp[i] = S[seed_no][i-1];
-	for(int i = 0; i < (int)strlen(temp); i++)
+	char temp[MAX_SEED_BUF];
+	int n = 0;
+	for(int i = 0; i < length; i++){
+		if(i == pos)
+			temp[n++] = '0';
+		temp[n++] = S[seed_no][i];
+	}
+	temp[n] = '\0';
+	l[seed_no] = n;
+	for(int i = 0; i <= n; i++)
 		S[seed_no][i] = temp[i];
-	S[seed_no][length + 1] = '\0';
 	MULTIPLE_SWAP1_OVERLAPS_FAST(S,NO_SEEDS);
 
 	return seed_no;
@@ -1055,16 +1086,17 @@ int remove_position(char** S, int* l, int NO_SEEDS, long long N){
 	}
 
 	int length = l[seed_no];
-	//length--;
-	l[seed_no] = length - 1;
-	char temp[length - 1];
-	for(int i = 0; i < pos; i++)
-		temp[i] = S[seed_no][i];
-	for(int i = pos + 1; i < length ; i++)
-		temp[i - 1] = S[seed_no][i];
-	for(int i = 0; i < (int)strlen(temp); i++)
+	char temp[MAX_SEED_BUF];
+	int n = 0;
+	for(int i = 0; i < length; i++){
+		if(i == pos)
+			continue;
+		temp[n++] = S[seed_no][i];
+	}
+	temp[n] = '\0';
+	l[seed_no] = n;
+	for(int i = 0; i <= n; i++)
 		S[seed_no][i] = temp[i];
-	S[seed_no][length - 1] = '\0';
 	MULTIPLE_SWAP1_OVERLAPS_FAST(S,NO_SEEDS);
 
 	return seed_no;
@@ -1073,133 +1105,59 @@ int remove_position(char** S, int* l, int NO_SEEDS, long long N){
 //try to further optimize locally found seed - indel optimization
 char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, double curSens)
 {
-	int trial = 200, flag = 0;	// trial value determines the number of indel iterations
+	const int trial = 200;	// number of indel iterations
 	double best = curSens;
-	//create a copy seed array
+	optimized_best = curSens;
 	char** tSEEDS = new char* [NO_SEEDS];
-	char** bestSEEDS = new char* [NO_SEEDS];
 	char** prevSEEDS = new char* [NO_SEEDS];
 	int * tl = new int [NO_SEEDS];
 	for(int j = 0; j < NO_SEEDS; j++){
-		tSEEDS[j] = new char[100];
-		bestSEEDS[j] = new char[100];
-		prevSEEDS[j] = new char[100];
-	}
-	// copying values from l to tl
-	for(int j = 0 ; j < NO_SEEDS; j++)
+		tSEEDS[j] = new char[MAX_SEED_BUF];
+		prevSEEDS[j] = new char[MAX_SEED_BUF];
 		tl[j] = l[j];
-	
-	for(int i = 1; i <= trial; i++){
+		for(int k = 0; k <= l[j]; k++)
+			tSEEDS[j][k] = seeds[j][k];
+	}
+	for(int step = 1; step <= trial; step++){
 		mode = 0;
-		int  choice = std::rand()%2;
-		// copy values from SEED to tSEED
-		if(i == 1){
-			for(int j = 0; j < NO_SEEDS; j++){
-				for(int k = 0; k < 100; k++){
-						tSEEDS[j][k] = seeds[j][k];
-						bestSEEDS[j][k] = seeds[j][k];
-						prevSEEDS[j][k] = seeds[j][k];
-				}
-				bestSEEDS[j][l[j]] = '\0';
-				prevSEEDS[j][l[j]] = '\0';
-			}
-		}
-		// try to increase sensitivity by adding random don't care position
-		else if(choice == 1){
+		int choice = std::rand()%2;
+		// Snapshot the current best state before trying one indel move.
+		for(int i = 0; i < NO_SEEDS; i++)
+			for(int j = 0; j <= tl[i]; j++)
+				prevSEEDS[i][j] = tSEEDS[i][j];
+
+		int t = (choice == 1)
+			? add_position(tSEEDS, tl, NO_SEEDS, N)
+			: remove_position(tSEEDS, tl, NO_SEEDS, N);
+		if(t != -1)
+			best = MultipleSensitivity(tSEEDS, NO_SEEDS, N, p, totalVirtualMem);
+		if(t != -1 && best > curSens){
+			curSens = best;
+			bestMode = mode;
+			optimized_best = curSens;
+		}else{
+			// Rejected move: restore the snapshot.
 			for(int i = 0; i < NO_SEEDS; i++){
-	 			for(int j = 0 ; j < 100; j++)
-					prevSEEDS[i][j] = tSEEDS[i][j];
-				prevSEEDS[i][tl[i]]= '\0';
-			}
-			int t = add_position(tSEEDS, tl, NO_SEEDS, N);
-			if(t == -1){
-				for(int i = 0; i < NO_SEEDS; i++){
-					for(int j = 0 ; j < 100; j++){
-						tSEEDS[i][j] = prevSEEDS[i][j];
-						tl[i] = strlen(tSEEDS[i]);
-						l[i] = strlen(tSEEDS[i]);
-					}
-					tSEEDS[i][tl[i]]= '\0';
-				}
-				continue;
-			}
-			best = MultipleSensitivity(tSEEDS, NO_SEEDS, N, p, totalVirtualMem);
-			if(best > curSens){
-				for(int i = 0; i < NO_SEEDS; i++){
-					for(int j = 0 ; j < 100; j++){
-						bestSEEDS[i][j] = tSEEDS[i][j];
-						flag = 1;
-						tl[i] = strlen(tSEEDS[i]);
-					}
-					bestSEEDS[i][tl[i]]= '\0';
-					l[i] = tl[i];
-				}
-				curSens = best;
-				bestMode = mode;
-				optimized_best = curSens;
-			}else{
-				for(int i = 0; i < NO_SEEDS; i++){
-					for(int j = 0 ; j < 100; j++){
-						tSEEDS[i][j] = prevSEEDS[i][j];
-						tl[i] = strlen(tSEEDS[i]);
-						l[i] = strlen(tSEEDS[i]);
-					}
-					tSEEDS[i][tl[i]]= '\0';
-				}
-			}
-		}			
-		// try to increase sensitivity by removing random don't care position
-		else{
-			for(int i = 0; i < NO_SEEDS; i++){                       
-	 			for(int j = 0 ; j < 100; j++)
-					prevSEEDS[i][j] = tSEEDS[i][j];
-				prevSEEDS[i][tl[i]]= '\0';
-		    }
-			int t = remove_position(tSEEDS, tl, NO_SEEDS, N);
-			if(t == -1){
-				for(int i = 0; i < NO_SEEDS; i++){
-					for(int j = 0 ; j < 100; j++){
-						tSEEDS[i][j] = prevSEEDS[i][j];
-						tl[i] = strlen(tSEEDS[i]);
-						l[i] = strlen(tSEEDS[i]);
-					}
-					tSEEDS[i][tl[i]]= '\0';
-				}
-				continue;
-			}
-			best = MultipleSensitivity(tSEEDS, NO_SEEDS, N, p, totalVirtualMem);
-			if(best > curSens){
-				for(int i = 0; i < NO_SEEDS; i++){
-					for(int j = 0 ; j < 100; j++){
-						bestSEEDS[i][j] = tSEEDS[i][j];
-						flag = 1;
-						tl[i] = strlen(tSEEDS[i]);
-					}
-					bestSEEDS[i][tl[i]] = '\0';
-					l[i] = tl[i];
-				}
-				curSens = best;
-				bestMode = mode;
-				optimized_best = curSens;
-			}else{
-				for(int i = 0; i < NO_SEEDS; i++){
-					for(int j = 0 ; j < 100; j++){
-						tSEEDS[i][j] = prevSEEDS[i][j];
-						tl[i] = strlen(tSEEDS[i]);
-						l[i] = strlen(tSEEDS[i]);
-					}
-					tSEEDS[i][tl[i]]= '\0';
-				}
+				tl[i] = (int)strlen(prevSEEDS[i]);
+				for(int j = 0; j <= tl[i]; j++)
+					tSEEDS[i][j] = prevSEEDS[i][j];
 			}
 		}
+	}
+	// tSEEDS always holds the best set found; copy it into the caller's buffers.
+	for(int i = 0; i < NO_SEEDS; i++){
+		l[i] = (int)strlen(tSEEDS[i]);
+		for(int j = 0; j <= l[i]; j++)
+			seeds[i][j] = tSEEDS[i][j];
+	}
+	for(int j = 0; j < NO_SEEDS; j++){
+		delete[] tSEEDS[j];
+		delete[] prevSEEDS[j];
 	}
 	delete[] tl;
 	delete[] tSEEDS;
 	delete[] prevSEEDS;
-	if(flag == 1)
-		return bestSEEDS;
-	else
-		return seeds;
+	return seeds;
 }
 
 // ALeS tries to compute random seeds with random lengths within the interval [min, max+1] that was computed by PRECOMPUTE_MIN_MAX function and then applies OC on those random seeds.
@@ -1274,15 +1232,10 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 		MULTIPLE_SWAP1_OVERLAPS_FAST(seeds, nSeeds);
 		curSens = MultipleSensitivity(seeds, nSeeds, N, p, totalVirtualMem);
 		if (curSens != -1){
-			char** bestSEEDS = new char* [nSeeds];
-			for(i = 0; i < nSeeds; i++)
-				bestSEEDS[i] = new char[100];
-			// try to further improve sensitivity for each locally found maximum using indel optimization
-			bestSEEDS =  findOptimal(seeds, length, nSeeds, N, p, curSens);
-			if(optimized_best > curSens){
+			// findOptimal keeps the improved set in place and reports its score globally.
+			findOptimal(seeds, length, nSeeds, N, p, curSens);
+			if(optimized_best > curSens)
 				curSens = optimized_best;
-				seeds = bestSEEDS;
-			}
 			else
 				bestMode = mode;
 			// calculate the average m and average M value, which will be used in adaptive length
@@ -1400,9 +1353,6 @@ void ALeS(char** S){
 		cout << "The program starts computing better seeds ..."<<endl;
 		cout << "If you reach a set of seeds with your desired sensitivity you can kill the program ... "<<endl;
 		
-		for(int i = 0;i < k;i++){
-			S[i] = new char[100];
-		}
 		RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(m, M, w, l, S, k, 500, N, p, sensitivity);
 	}
 }
@@ -1436,11 +1386,11 @@ int main(int argc, char **argv)
 	p = atof(argv[3]);  // similarity
 	N = atoi(argv[4]);  // length of homology region
 	if(argc == 5)
-		upperBound = N;
+		upperBound = N - 1;		// seeds must be shorter than the region
 	else
 		upperBound = atoi(argv[5]);  // upper bound of seed lengths
 	
-	l = new int[k];		// seeds' lengths array
+	l = NULL;		// seeds' lengths array (allocated after validation)
 	
 	//calculating the array size in advance required for estimating sensitivity
 	if(N <= 32)
@@ -1450,9 +1400,7 @@ int main(int argc, char **argv)
 	else
 		homologous_array_size = array_size * sizeof(uint128_t);
 	
-	char** S = new char* [k];   // set of seeds
-	for(int i = 0;i < k;i++)
-		S[i] = new char[100];
+	char** S = NULL;   // set of seeds (allocated after validation)
 	try{
 		if(w < 1 || w >= N){
 			cerr<<"Invalid seed weight !!!"<<endl;
@@ -1464,12 +1412,12 @@ int main(int argc, char **argv)
 			verbose();
 			return 1;
 		}
-		if(p < 0 || p > 1){
+		if(!(p >= 0.0 && p <= 1.0)){		// NaN-safe
 			cerr<<"Invalid similarity level !!!"<<endl;
 			verbose();
 			return 1;
 		}
-		if(N <= 0 || N > 127){
+		if(N <= 0 || N > MAX_SEED_LEN){
 			cerr<<"Invalid region length !!!"<<endl;
 			verbose();
 			return 1;
@@ -1486,6 +1434,10 @@ int main(int argc, char **argv)
 			//verbose();
 			return 1;
 		}
+		l = new int[k];		// seeds' lengths array
+		S = new char* [k];	// set of seeds
+		for(int i = 0;i < k;i++)
+			S[i] = new char[MAX_SEED_BUF];
 		ALeS(S);
 	}catch(std::bad_alloc){
 		cerr << "Memory error (Allocation failed)"<<endl

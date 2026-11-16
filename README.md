@@ -49,9 +49,11 @@ This will generate 4 spaced seeds, each of weight 10 having similarity level of 
 <weight> : Number of match positions in each seed
 <numberOfSeeds> : Number of seeds
 <similarity> : Similarity level
-<lengthOfHomologyRegion> : Length of homologous region
-<seed_length_upperBound> [optional] : Seed length upper bound
+<lengthOfHomologyRegion> : Length of homologous region (at most 127)
+<seed_length_upperBound> [optional] : Seed length upper bound; defaults to region_length - 1
 ```
+
+Seeds must be shorter than the region, so the default upper bound is `region_length - 1`. The exact sensitivity DP keeps each reversed seed in 64 bits; a seed longer than 63 bases is scored with the sampling estimator instead, which supports region lengths up to 128. For region lengths above 128 the seed length upper bound must stay at 63 or below.
 
 **Output:**
 
@@ -70,7 +72,7 @@ Real sensitivity = 0.90968
 `ALeSc` is the same sensitivity-based designer with one extra constraint: every shape must contain at least `corelength` consecutive match positions (`1`s). That *m*-core is kept during search. Seed weight, optional length upper bound, and the Li et al. multiple-seed sensitivity DP are unchanged.
 
 ```
-./ALeSc <weight> <numberOfSeeds> <similarity> <region_length> <corelength> [<upperBound>] [<symmetryFlag>] [frozenSeeds...]
+./ALeSc <weight> <numberOfSeeds> <similarity> <region_length> <corelength> [<upperBound>] [<symmetryFlag>] [<palindromeMode>] [frozenSeeds...]
 ```
 
 Example (weight 31, two seeds, similarity 0.90, homology length 100, core 19, length at most 39, score each seed with its reverse):
@@ -83,12 +85,21 @@ Example (weight 31, two seeds, similarity 0.90, homology length 100, core 19, le
 <weight>            : Number of match positions in each seed
 <numberOfSeeds>     : Number of designed seeds (k)
 <similarity>        : Similarity level
-<region_length>     : Length of homologous region
-<corelength>        : Minimum run of consecutive 1s in every shape
-<upperBound>        : Optional; maximum seed length (must be < region_length and >= weight)
+<region_length>     : Length of homologous region (at most 511)
+<corelength>        : Minimum run of consecutive 1s in every shape (1..weight)
+<upperBound>        : Optional; maximum seed length (must be < region_length and >= weight);
+                      defaults to region_length - 1
 <symmetryFlag>      : Optional; 1 to score and print each designed seed together with its reverse
+<palindromeMode>    : Optional; 0 unconstrained (default), 1 every shape palindromic, 2 palindromes forbidden
 [frozenSeeds...]    : Optional 01-strings; freeze these k-1 seeds (cores stay put) and search for the rest
 ```
+
+Mode 1 requires the span and weight to share a parity and makes the symmetry flag redundant. Mode 2 also rejects shapes that are reverses of each other, so the doubled set has 2*k* distinct shapes.
+
+The one ambiguous argument is a single weight-1 seed `1`: when `k > 1` and it is the only
+extra argument, it is read as a frozen seed rather than as palindrome mode 1.
+
+The exact sensitivity DP keeps each reversed seed in 64 bits; a seed longer than 63 bases is scored with the sampling estimator instead, which supports region lengths up to 128. For region lengths above 128 the seed length upper bound must stay at 63 or below.
 
 When `k > 1` and no frozen seeds are given, ALeSc grows the set from 1 to *k*: it freezes the best *k*−1 cores, searches for the new seed, and still allows flank `1`/`0` moves on the older seeds. A final polish unfreezes all seeds.
 

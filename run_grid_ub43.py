@@ -23,6 +23,9 @@ OMP_THREADS = os.environ.get("OMP_NUM_THREADS", "4")
 TAG = "" if N == 100 else f"_n{N}"
 
 seed_pat = re.compile(r"^\s*(?:\d+\|)?\s*([01]+)\s*$")
+BEST_SENS = re.compile(
+    r"Best sensitivity is\s+(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)")
+GRID_TIMEOUT = 3600
 
 
 def last_seeds(text, want_k=None):
@@ -56,8 +59,10 @@ def last_seeds(text, want_k=None):
 
 
 def parse_best(text):
-    m = re.search(r"Best sensitivity is\s+([0-9.eE+-]+)", text)
-    return float(m.group(1)) if m else None
+    # The final "Best sensitivity is" line is authoritative; earlier ones are
+    # per-restart progress reports.
+    found = BEST_SENS.findall(text)
+    return float(found[-1]) if found else None
 
 
 def write_summary(path, rows, tag):
@@ -139,15 +144,23 @@ def run_one(k, cl, symmetry, base_seeds=None):
     t0 = time.time()
     extra = f" frozen={len(base_seeds[:k-1])}" if base_seeds else ""
     print(f"START {'sym' if symmetry else 'nosym'} k={k} cl={cl} N={N}{extra}", flush=True)
-    proc = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True,
+                              timeout=GRID_TIMEOUT)
+        rc = proc.returncode
+        text = (proc.stdout or "") + (proc.stderr or "")
+    except subprocess.TimeoutExpired as exc:
+        rc = -1
+        text = "TIMEOUT after %d s\n" % GRID_TIMEOUT
+        text += (exc.stdout or "") if isinstance(exc.stdout, str) else ""
+        text += (exc.stderr or "") if isinstance(exc.stderr, str) else ""
     dt = time.time() - t0
-    text = (proc.stdout or "") + (proc.stderr or "")
     log.write_text(text)
     best = parse_best(text)
     seeds = last_seeds(text, k)
     print(
         f"DONE {'sym' if symmetry else 'nosym'} k={k} cl={cl} "
-        f"best={best} time={dt:.1f}s rc={proc.returncode}",
+        f"best={best} time={dt:.1f}s rc={rc}",
         flush=True,
     )
     return {
@@ -156,7 +169,7 @@ def run_one(k, cl, symmetry, base_seeds=None):
         "best": best,
         "seeds": seeds,
         "time": dt,
-        "rc": proc.returncode,
+        "rc": rc,
     }
 
 
@@ -168,6 +181,14 @@ def run_grid(symmetry):
     summary = outdir / (
         f"summary_sym_{SPAN}{TAG}.txt" if symmetry else f"summary_{SPAN}{TAG}.txt"
     )
+    prev_summary = outdir / (
+        f"summary_sym_{SPAN}{TAG}_prev.txt" if symmetry
+        else f"summary_{SPAN}{TAG}_prev.txt"
+    )
+    # Keep the previous grid as the comparison baseline; the loop below rewrites
+    # `summary` after every row, so this has to happen before the first row.
+    if summary.exists():
+        prev_summary.write_text(summary.read_text())
     label = "sym" if symmetry else "nosym"
     print(f"==== GRID {label} ub={SPAN} N={N} ====", flush=True)
     prev_by_cl = {}

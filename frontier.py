@@ -13,48 +13,57 @@ conceivable core is 19 and core 20 is impossible outright.
 
 Core 18 is already known feasible at the heaviest weight, and feasibility only improves
 as weight falls, so the frontier is 18 or 19 everywhere and is pinned by one number: the
-largest weight at which core 19 still clears p. That is a single bisection.
+largest weight at which the longest reachable core still clears p. That is a single
+bisection.
 
-Set A forbids palindromes, which matters here: the solid 19-mer attains the ceiling
-exactly but is its own reverse, so weight must exceed 19 and some flank cost is
+Set A forbids palindromes, which matters here: the solid m-mer attains the ceiling
+exactly but is its own reverse, so weight must exceed m and some flank cost is
 unavoidable.
 """
 import sys
 
-from rshit import MODE_FORBID_PALINDROME, run
+from rshit import (MODE_FORBID_PALINDROME, core_ceiling, longest_possible_core,
+                   run)
 
-WL, SIM, P, CORE, MS, SPAN = 150, 0.92, 0.98, 19, 8, 40
+WL, SIM, P, MS, SPAN = 150, 0.92, 0.98, 8, 40
 TRIES = 250
 
 
-def probe(weight):
-    tag = "frontier_w%d_cl%d" % (weight, CORE)
-    probs, shapes, span = run(weight, MS, SIM, WL, CORE, SPAN, True,
+def probe(weight, core):
+    tag = "frontier_w%d_cl%d" % (weight, core)
+    probs, shapes, span = run(weight, MS, SIM, WL, core, SPAN, True,
                               MODE_FORBID_PALINDROME, tag, target=P, tries=TRIES)
     top = probs[-1] if probs else -1.0
     ok = top > P
     print("  weight %2d core %d -> %.4f with %d designed shape(s) %s"
-          % (weight, CORE, top, len(probs), "ok" if ok else "short"))
+          % (weight, core, top, len(probs), "ok" if ok else "short"))
     sys.stdout.flush()
     return ok, top, shapes, span
 
 
 def main():
+    core = longest_possible_core(WL, SIM, P)
+    ceiling = core_ceiling(WL, SIM, core)
     print("Frontier at wl=%d, sim=%s, p>%s, at most %d gapped shapes plus free reverses"
           % (WL, SIM, P, MS))
-    print("core %d has an exact ceiling of 0.9805, so this is the last reachable core"
-          % CORE)
+    print("core %d has an exact ceiling of %.4f, so this is the last reachable core"
+          % (core, ceiling))
     cache = {}
 
     def feasible(w):
         if w not in cache:
-            cache[w] = probe(w)
+            cache[w] = probe(w, core)
         return cache[w][0]
 
-    lo, hi = 20, 31          # 20 is the lightest non-palindromic option, 31 known short
+    # The solid core is its own reverse, so Set A needs weight > core. The heaviest
+    # usable weight is the span bound itself; feasibility is monotone in weight.
+    lo, hi = core + 1, SPAN
+    if lo > hi:
+        print("\nno non-palindromic weight can carry core %d within span %d" % (core, hi))
+        return
     if not feasible(lo):
-        print("\ncore %d is out of reach at every weight; the frontier is core 18 "
-              "from weight %d all the way to 31." % (CORE, lo))
+        print("\ncore %d is out of reach at every weight; the frontier is core %d "
+              "from weight %d all the way to %d." % (core, core - 1, core, SPAN))
         return
     while lo < hi:
         mid = (lo + hi + 1) // 2
@@ -64,9 +73,13 @@ def main():
             hi = mid - 1
     ok, top, shapes, span = cache[lo]
     print("\nheaviest weight reaching core %d is %d (hit %.4f, %d designed shapes)"
-          % (CORE, lo, top, len(shapes)))
-    print("so the frontier is: core %d for weight 20..%d, core 18 for weight %d..31"
-          % (CORE, lo, lo + 1))
+          % (core, lo, top, len(shapes)))
+    if lo < SPAN:
+        print("so the frontier is: core %d for weight %d..%d, core %d for weight %d..%d"
+              % (core, core + 1, lo, core - 1, lo + 1, SPAN))
+    else:
+        print("so the frontier is: core %d for weight %d..%d"
+              % (core, core + 1, lo))
     for s in shapes:
         print("    %s  span=%d weight=%d core=%d"
               % (s, len(s), s.count("1"), max(len(r) for r in s.split("0"))))
