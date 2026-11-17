@@ -200,6 +200,7 @@ static thread_local OcBuf tls_oc;
 static thread_local DpBuf tls_dp;
 static thread_local SeedBuf tls_restart;
 static thread_local SeedBuf tls_oc_exp;
+static thread_local SeedBuf tls_polish;
 
 static inline int8_t& oc_om(int8_t* om, int nSeeds, int maxLen, int a, int b, int r, int c)
 {
@@ -1355,7 +1356,8 @@ double greedy_tail_ascent(char** globalBest, int* globalBestLen, int nSeeds, int
 						continue;
 					}
 					bool usedEst = false;
-					double curSens = MultipleSensitivity(work, nSeeds, N, p, totalVirtualMem, &usedEst);
+					double curSens = MultipleSensitivity(work, nSeeds, N, p, totalVirtualMem,
+						&usedEst, false, bestSens);
 					if (curSens > bestSens) {
 						bestSens = curSens;
 						bestMode = usedEst;
@@ -1431,7 +1433,8 @@ double greedy_core_slide(char** globalBest, int* globalBestLen, int nSeeds, int 
 					continue;
 				}
 				bool usedEst = false;
-				double curSens = MultipleSensitivity(work, nSeeds, N, p, totalVirtualMem, &usedEst);
+				double curSens = MultipleSensitivity(work, nSeeds, N, p, totalVirtualMem,
+					&usedEst, false, bestSens);
 				if (curSens > bestMoveSens) {
 					bestMoveSens = curSens;
 					bestMode = usedEst;
@@ -1505,7 +1508,8 @@ double local_search_from_best(char** globalBest, int* globalBestLen, int nSeeds,
 		}
 
 		bool sensUsedEstimate = false;
-		double curSens = MultipleSensitivity(work, nSeeds, N, p, totalVirtualMem, &sensUsedEstimate);
+		double curSens = MultipleSensitivity(work, nSeeds, N, p, totalVirtualMem,
+			&sensUsedEstimate, false, bestSens);
 		if (curSens == -1) {
 			localStale++;
 			continue;
@@ -2280,7 +2284,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 	else
 		mode = 0;
 	long long i=0, j=0, b=0, pos=0, MAX_L=0, level=0, prev_level_start=0, prev_level_end=0, compatible=0,
-	hit=0, suffix_link=0, zero_link=0, new_i=0;
+	hit=0, suffix_link=0, zero_link=0, new_i=0, rows=0, delta=0;
 	unsigned long long b_zero=0, b_one=0;
 	long long MAX_NO_BS;
 	double f0=0, f1=0, result = 0;
@@ -2450,31 +2454,43 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 				if (zero_link != 0)
 					BS[i][6] = BS[zero_link][1];
 			}
-		// compute the f's  f[i][j] = probab to hit a prefix of length i that ends with INT_TO_BIN_REVERSED[BS[j][0]]
-		tls_dp.ensure_f((size_t)(N + 1) * (size_t)NO_BS, (size_t)N + 1);
+		// Sliding-window DP. f[i][j] reads only row i - delta_j, where
+		// delta_j = level(j) - level(zero_link(j)) + 1. Keeping the last
+		// (maxDelta+1) rows makes memory independent of the region length N.
+		rows = 2;
+		for (j=1; j<NO_BS; ++j) {
+			delta = BS[j][5] - BS[BS[j][6]][5] + 1;
+			if (delta + 1 > rows) rows = delta + 1;
+		}
+		if (rows > N + 1) rows = N + 1;
+		// Power-of-two row count: a bitmask replaces the division in the inner loop.
+		long long rowSlots = 1;
+		while (rowSlots < rows) rowSlots <<= 1;
+		rows = rowSlots;
+		const long long rowMask = rows - 1;
+		tls_dp.ensure_f((size_t)rows * (size_t)NO_BS, (size_t)rows);
 		fdata = tls_dp.fdata;
 		f = tls_dp.f;
-		memset(fdata, 0, sizeof(double) * (size_t)(N + 1) * (size_t)NO_BS);
-		for (i=0; i<=N; i++)
+		for (i=0; i<rows; i++)
 			f[i] = fdata + i * NO_BS;
 		for (i=0; i<=N; i++) {
+			long long cur = i & rowMask;
+			memset(f[cur], 0, sizeof(double) * (size_t)NO_BS);
 			for (j=NO_BS-1; j>=0; j--) {
-				if (i==0) f[i][j] = 0;					// empty prefix of random region cannot be hit
-				else if (i < BS[j][5]) f[i][j] = 0;		// too short
-				else if (BS[j][4] == 1) f[i][j] = 1;	// hit
-				else {
-					new_i = i - BS[j][5] + BS[BS[j][6]][5] - 1;
-					if (new_i < 0) new_i = 0;
-					f0 = f[ new_i ][ BS[j][6] ];
-					if (BS[j][2] < 0)
-						f1 = 1;
-					else
-						f1 = f[ i ][ BS[j][2] ];
-					f[i][j] = (1-P)*f0 + P*f1;
-				}
+				if (i==0 || i < BS[j][5]) { f[cur][j] = 0; continue; } // empty / too short
+				if (BS[j][4] == 1) { f[cur][j] = 1; continue; }        // hit
+				new_i = i - BS[j][5] + BS[BS[j][6]][5] - 1;
+				// new_i < 0 only means the zero-link is epsilon on a state whose
+				// level equals i; the original code read f[0][epsilon] == 0.
+				f0 = (new_i < 0) ? 0.0 : f[new_i & rowMask][ BS[j][6] ];
+				if (BS[j][2] < 0)
+					f1 = 1;
+				else
+					f1 = f[cur][ BS[j][2] ];
+				f[cur][j] = (1-P)*f0 + P*f1;
 			}
+			if (i == N) result = f[cur][0];
 		}
-		result = f[N][0];
 	}
 	catch(std::bad_alloc){
 		return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate, threshold);
@@ -2830,7 +2846,8 @@ char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, do
 				}
 				continue;
 			}
-			best = MultipleSensitivity(tSEEDS, NO_SEEDS, N, p, totalVirtualMem, &usedEstimate);
+			best = MultipleSensitivity(tSEEDS, NO_SEEDS, N, p, totalVirtualMem,
+				&usedEstimate, false, curSens);
 			if(best > curSens){
 				for(int i = 0; i < NO_SEEDS; i++){
 					for(int j = 0 ; j < MAX_SEED_BUF; j++){
@@ -2888,7 +2905,8 @@ char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, do
 				}
 				continue;
 			}
-			best = MultipleSensitivity(tSEEDS, NO_SEEDS, N, p, totalVirtualMem, &usedEstimate);
+			best = MultipleSensitivity(tSEEDS, NO_SEEDS, N, p, totalVirtualMem,
+				&usedEstimate, false, curSens);
 			if(best > curSens){
 				for(int i = 0; i < NO_SEEDS; i++){
 					for(int j = 0 ; j < MAX_SEED_BUF; j++){
@@ -2943,8 +2961,14 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 	double avg_m = 0.0, avg_M = 0.0;
 	(void)m; (void)M;
 	double t[2] = {0, 0};
-	std::random_device rd;
-	unsigned baseSeed = (unsigned)rd() ^ (unsigned)time(0) ^ (unsigned)(uintptr_t)&baseSeed;
+	unsigned baseSeed;
+	const char* fixedSeed = getenv("ALESC_SEED");
+	if (fixedSeed && atol(fixedSeed) != 0)
+		baseSeed = (unsigned)atol(fixedSeed);
+	else {
+		std::random_device rd;
+		baseSeed = (unsigned)rd() ^ (unsigned)time(0) ^ (unsigned)(uintptr_t)&baseSeed;
+	}
 
 	char** globalBest = new char* [nSeeds];
 	int* globalBestLen = new int [nSeeds];
@@ -3176,9 +3200,17 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 // This set is called ALeS-initial seed. Then the program tries to improve the seeds by computing random seeds and applying OC on them.
 void ALeS(char** S){
 	
-	srand((unsigned )(time(0)));
-	std::random_device rd;
-	ale_srand((unsigned)rd() ^ (unsigned)time(0));
+	const char* fixedSeed = getenv("ALESC_SEED");
+	if (fixedSeed && atol(fixedSeed) != 0) {
+		unsigned seed = (unsigned)atol(fixedSeed);
+		srand(seed);
+		ale_srand(seed);
+	}
+	else {
+		srand((unsigned)(time(0)));
+		std::random_device rd;
+		ale_srand((unsigned)rd() ^ (unsigned)time(0));
+	}
 	double t[2];
 	// calculating the total memory available in the system to prevent the code from crashing while computing sensitivity.
 	//total virtual memory of the system is total memory available - (1.5 time the size of homologous array)

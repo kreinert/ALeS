@@ -118,7 +118,9 @@ affects scoring cost, never which candidate wins. The default is ample for ranki
 candidates; for a borderline feasibility decision, re-run the final configuration
 with `ALESC_EST_SAMPLES=100000000` to recover the old estimator precision.
 `ALESC_REPORT_BOTH=1` prints the exact DP and QMC sensitivities of the final set
-side by side.
+side by side. `ALESC_SEED=<n>` makes a single-threaded run reproducible for
+regression testing. The exact DP keeps only a sliding window of rows, so its memory
+is independent of the region length.
 
 **Cite:**
 

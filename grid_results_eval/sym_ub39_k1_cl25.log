@@ -1,0 +1,73 @@
+Restart budget reduced to 100 tries.
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 15 --- 
+seeds:
+designed:
+1111111111111111111111111111111
+reversed:
+1111111111111111111111111111111
+
+Real sensitivity = 0.285651
+time (since beginning): 8.6e-05
+
+ --- random try number 5 --- 
+seeds:
+designed:
+1001111111111111111111111111111101
+reversed:
+1011111111111111111111111111111001
+
+Real sensitivity = 0.331214
+time (since beginning): 0.000123
+
+ --- random try number 7 --- 
+seeds:
+designed:
+101010011111111111111111111111110001101
+reversed:
+101100011111111111111111111111110010101
+
+Real sensitivity = 0.417537
+time (since beginning): 0.00114
+
+ --- random try number 10 --- 
+seeds:
+designed:
+110110000011111111111111111111111110101
+reversed:
+101011111111111111111111111110000011011
+
+Real sensitivity = 0.452244
+time (since beginning): 0.002524
+
+ --- random try number 0 --- 
+seeds:
+designed:
+111111111111111111111111100010101001011
+reversed:
+110100101010001111111111111111111111111
+
+Real sensitivity = 0.48709
+time (since beginning): 0.005074
+
+ --- final polish --- 
+
+seeds:
+designed:
+111111111111111111111111100010101001011
+reversed:
+110100101010001111111111111111111111111
+
+
+Best sensitivity is 0.48709
+
+Computed in 0.005074 seconds
+
+Total time (100 iterations): 0.220134 seconds
