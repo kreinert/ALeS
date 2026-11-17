@@ -1,0 +1,89 @@
+Restart budget reduced to 800 tries.
+Generating 1 seeds of weight 45 for similarity level 0.95 and length of homology region 150
+
+Every shape is a palindrome, so the set is already closed under reversal.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (10 threads).
+
+Cannot score some seed sets: the exact DP needs 2.71121 GB per thread but only 1.95883 GB is available, and the estimator only supports region length <= 128.
+Those sets are being skipped. The automaton grows like 2^(span - weight), so lower the seed length upper bound.
+
+ --- random try number 3 --- 
+seeds:
+110111111111011111111101111101111111110111111111011
+
+Real sensitivity = 0.799838
+time (since beginning): 0.014328
+
+ --- random try number 9 --- 
+seeds:
+111111101111111111101111010111101111111111101111111
+
+Real sensitivity = 0.814057
+time (since beginning): 0.041909
+
+ --- random try number 11 --- 
+seeds:
+11111111111111010011111011111011111001011111111111111
+
+Real sensitivity = 0.816569
+time (since beginning): 0.046043
+
+ --- random try number 19 --- 
+seeds:
+1111101111110111101111001111111001111011110111111011111
+
+Real sensitivity = 0.837063
+time (since beginning): 0.088897
+
+ --- random try number 17 --- 
+seeds:
+1111111101101000111101111111001001111111011110001011011111111
+
+Real sensitivity = 0.847788
+time (since beginning): 6.69216
+
+ --- greedy tail (from try 17) --- 
+seeds:
+1011111101101100111101111111001001111111011110011011011111101
+
+Real sensitivity = 0.848195
+time (since beginning): 16.3498
+
+ --- local search step 4 (from try 17) --- 
+seeds:
+1111111111011000111101011101011101011101011110001101111111111
+
+Real sensitivity = 0.861215
+time (since beginning): 37.6307
+
+ --- final polish --- 
+
+ --- greedy tail (from try -1) --- 
+seeds:
+1111110111011010111101011101011101011101011110101101110111111
+
+Real sensitivity = 0.861245
+time (since beginning): 416.242
+
+ --- local search step 23 (from try -1) --- 
+seeds:
+1111110111011010111101111101001001011111011110101101110111111
+
+Real sensitivity = 0.861465
+time (since beginning): 429.846
+
+ --- local search step 1 (from try -1) --- 
+seeds:
+1111110111111010011101011101011101011101011100101111110111111
+
+Real sensitivity = 0.863709
+time (since beginning): 439.707
+
+Best sensitivity is 0.863709
+
+Computed in 6.69216 seconds
+
+Total time (800 iterations): 442.144 seconds

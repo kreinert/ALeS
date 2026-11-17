@@ -1,0 +1,201 @@
+Generating 3 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Successive construction: grow from 1 to 3 seeds.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 5 --- 
+seeds:
+011011111111111111111111111111111
+
+Real sensitivity = 0.321976
+time (since beginning): 0.000131
+
+ --- random try number 15 --- 
+seeds:
+10001010110101111111111111111111111111
+
+Real sensitivity = 0.384926
+time (since beginning): 0.000228
+
+ --- random try number 6 --- 
+seeds:
+011010100111111111111111111111100110111
+
+Real sensitivity = 0.435282
+time (since beginning): 0.001467
+
+ --- random try number 10 --- 
+seeds:
+111010110001111111111111111111111001011
+
+Real sensitivity = 0.446311
+time (since beginning): 0.00189
+
+ --- random try number 11 --- 
+seeds:
+111001111111111111111111111001001010111
+
+Real sensitivity = 0.447498
+time (since beginning): 0.003278
+
+ --- random try number 14 --- 
+seeds:
+111010100111001001111111111111111111111
+
+Real sensitivity = 0.458643
+time (since beginning): 0.003724
+
+ --- greedy tail (from try 14) --- 
+seeds:
+111010101101001001111111111111111111111
+
+Real sensitivity = 0.458742
+time (since beginning): 0.013578
+
+ --- local search step 21 (from try 14) --- 
+seeds:
+111001101101010001111111111111111111111
+
+Real sensitivity = 0.46089
+time (since beginning): 0.028135
+
+ --- random try number 182 --- 
+seeds:
+111111111111111111111100010101101100111
+
+Real sensitivity = 0.46089
+time (since beginning): 0.073896
+
+ --- final polish --- 
+
+seeds:
+111111111111111111111100010101101100111
+
+
+Best sensitivity is 0.46089
+
+Computed in 0.073896 seconds
+
+
+=== growing to 2 seeds; freezing 1 ===
+111111111111111111111100010101101100111
+
+ALeS initial seed set is: 
+
+111111111111111111111100010101101100111
+011010110011101001111111111111111111111
+
+Computed in 3.10235 seconds
+
+Real Sensitivity is 0.572643
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (4 threads).
+
+ --- random try number 10 --- 
+seeds:
+111111111111111111111100010101101100111
+111010100110110001111111111111111111111
+
+Real sensitivity = 0.575456
+time (since beginning): 0.004485
+
+ --- greedy tail (from try 10) --- 
+seeds:
+111111111111111111111100010101101100111
+101010110110110001111111111111111111111
+
+Real sensitivity = 0.576267
+time (since beginning): 0.070599
+
+ --- random try number 30 --- 
+seeds:
+111111111111111111111100010101101100111
+110110101010110001111111111111111111111
+
+Real sensitivity = 0.576783
+time (since beginning): 0.22073
+
+ --- final polish --- 
+
+seeds:
+111111111111111111111100010101101100111
+110110101010110001111111111111111111111
+
+
+Best sensitivity is 0.576783
+
+Computed in 0.22073 seconds
+
+
+=== growing to 3 seeds; freezing 2 ===
+111111111111111111111100010101101100111
+110110101010110001111111111111111111111
+
+ALeS initial seed set is: 
+
+111111111111111111111100010100110110111
+110110111001010001111111111111111111111
+110101001111111111111111111111000110111
+
+Computed in 14.7837 seconds
+
+Real Sensitivity is 0.600417
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (4 threads).
+
+ --- random try number 40 --- 
+seeds:
+111111111111111111111100010100110110111
+110110101010110001111111111111111111111
+111001001111111111111111111111001010111
+
+Real sensitivity = 0.600672
+time (since beginning): 0.050745
+
+ --- random try number 42 --- 
+seeds:
+111111111111111111111100010100110110111
+111011011001010001111111111111111111111
+110110001111111111111111111111001010111
+
+Real sensitivity = 0.6007
+time (since beginning): 0.053631
+
+ --- random try number 90 --- 
+seeds:
+111111111111111111111100010100110110111
+111011011001010001111111111111111111111
+110101001111111111111111111111000110111
+
+Real sensitivity = 0.600749
+time (since beginning): 0.297772
+
+ --- random try number 2266 --- 
+seeds:
+111111111111111111111100011001010110111
+111011011001010001111111111111111111111
+110101001111111111111111111111001001111
+
+Real sensitivity = 0.601147
+time (since beginning): 3.11011
+
+ --- final polish --- 
+
+seeds:
+111111111111111111111100011001010110111
+111011011001010001111111111111111111111
+110101001111111111111111111111001001111
+
+
+Best sensitivity is 0.601147
+
+Computed in 3.11011 seconds
+
+Total time (12000 iterations): 30.8141 seconds

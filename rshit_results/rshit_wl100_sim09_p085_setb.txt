@@ -1,0 +1,19 @@
+RSHit: window 100, similarity 0.9, hit probability must exceed 0.85, at most 4 shapes
+
+=== Set B: palindromic, m=1, fewest shapes ===
+weight 32 down to 15, window 100, similarity 0.9, need hit probability > 0.85
+  k=1 weight 32 (600 tries) -> 0.4986 short
+  k=1 weight 15 (600 tries) -> 0.9964 ok
+  k=1 weight 23 (600 tries) -> 0.8783 ok
+  k=1 weight 27 (600 tries) -> 0.7281 short
+  k=1 weight 25 (600 tries) -> 0.8103 short
+  k=1 weight 24 (600 tries) -> 0.8461 short
+  bisection says weight 23; re-checking 24..25 with 800 tries
+  k=1 weight 24 (800 tries) -> 0.8461 short
+  k=1 weight 25 (800 tries) -> 0.8103 short
+  1 palindromic shape(s), weight 23
+  final run at weight 23, 1 shape(s), full budget, no early exit
+  hit probability 0.8794 at span <= 40
+    111111001010011001010100110010100111111  span=39 weight=23 core=6 palindrome=True
+    guaranteed m-core = 6
+    1 shape(s) in the index

@@ -1,0 +1,119 @@
+Generating 2 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Successive construction: grow from 1 to 2 seeds.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 15 --- 
+seeds:
+111111101111011111111111111111111
+
+Real sensitivity = 0.4433
+time (since beginning): 0.000137
+
+ --- random try number 5 --- 
+seeds:
+011011111111111111111111010111011111
+
+Real sensitivity = 0.446906
+time (since beginning): 0.000185
+
+ --- random try number 10 --- 
+seeds:
+011101110100111111111111111110101101111
+
+Real sensitivity = 0.486842
+time (since beginning): 0.001325
+
+ --- random try number 8 --- 
+seeds:
+111010110011111111111111111010110110111
+
+Real sensitivity = 0.491273
+time (since beginning): 0.001866
+
+ --- random try number 18 --- 
+seeds:
+110110110101110011101011111111111111111
+
+Real sensitivity = 0.507593
+time (since beginning): 0.002334
+
+ --- random try number 0 --- 
+seeds:
+111111111111111110010111010111001101111
+
+Real sensitivity = 0.517049
+time (since beginning): 0.003368
+
+ --- random try number 60 --- 
+seeds:
+111100111011010111010011111111111111111
+
+Real sensitivity = 0.517689
+time (since beginning): 0.085696
+
+ --- random try number 118 --- 
+seeds:
+111111111111111110010111010110111001111
+
+Real sensitivity = 0.517689
+time (since beginning): 0.123727
+
+ --- final polish --- 
+
+seeds:
+111111111111111110010111010110111001111
+
+
+Best sensitivity is 0.517689
+
+Computed in 0.123727 seconds
+
+
+=== growing to 2 seeds; freezing 1 ===
+111111111111111110010111010110111001111
+
+ALeS initial seed set is: 
+
+111111111111111110010111010110011101111
+111010101101101101110011111111111111111
+
+Computed in 3.39399 seconds
+
+Real Sensitivity is 0.642998
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (4 threads).
+
+ --- random try number 8 --- 
+seeds:
+111111111111111110010111010110111001111
+111011010101101101110011111111111111111
+
+Real sensitivity = 0.64312
+time (since beginning): 0.007436
+
+ --- greedy tail (from try 8) --- 
+seeds:
+111111111111111110010111010110111001111
+111101010101101101110011111111111111111
+
+Real sensitivity = 0.645809
+time (since beginning): 0.104959
+
+ --- final polish --- 
+
+seeds:
+111111111111111110010111010110111001111
+111101010101101101110011111111111111111
+
+
+Best sensitivity is 0.645809
+
+Computed in 0.007436 seconds
+
+Total time (12000 iterations): 14.499 seconds

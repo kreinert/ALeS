@@ -1,0 +1,177 @@
+Stopping as soon as sensitivity 0.95 is reached.
+Restart budget reduced to 250 tries.
+Generating 6 seeds of weight 31 for similarity level 0.94 and length of homology region 100
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+Rejecting palindromes and mutual reverses, so all shapes stay distinct.
+Successive construction: grow from 1 to 6 seeds.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (2 threads).
+
+ --- random try number 0 --- 
+seeds:
+designed:
+1111111111111111111110101011111001001001
+reversed:
+1001001001111101010111111111111111111111
+
+Real sensitivity = 0.895651
+time (since beginning): 0.00467
+
+ --- random try number 10 --- 
+seeds:
+designed:
+1111111111111111111000100110100011111111
+reversed:
+1111111100010110010001111111111111111111
+
+Real sensitivity = 0.902862
+time (since beginning): 0.005315
+
+ --- random try number 11 --- 
+seeds:
+designed:
+1111111111111111110010011110101010111101
+reversed:
+1011110101010111100100111111111111111111
+
+Real sensitivity = 0.925742
+time (since beginning): 0.0083
+
+ --- greedy tail (from try 11) --- 
+seeds:
+designed:
+1111111111111111110010011010111010111101
+reversed:
+1011110101110101100100111111111111111111
+
+Real sensitivity = 0.926905
+time (since beginning): 0.069853
+
+ --- local search step 22 (from try 11) --- 
+seeds:
+designed:
+1111111111111111110000111010111011101101
+reversed:
+1011011101110101110000111111111111111111
+
+Real sensitivity = 0.92835
+time (since beginning): 0.240992
+
+ --- random try number 202 --- 
+seeds:
+designed:
+1111111111111111110001110110011101101101
+reversed:
+1011011011100110111000111111111111111111
+
+Real sensitivity = 0.929559
+time (since beginning): 0.443598
+
+ --- greedy tail (from try 202) --- 
+seeds:
+designed:
+1111111111111111110001110011011101101101
+reversed:
+1011011011101100111000111111111111111111
+
+Real sensitivity = 0.929574
+time (since beginning): 0.498422
+
+ --- final polish --- 
+
+ --- greedy tail (from try -1) --- 
+seeds:
+designed:
+1111111111111111110001110011010101101111
+reversed:
+1111011010101100111000111111111111111111
+
+Real sensitivity = 0.929893
+time (since beginning): 0.744573
+
+ --- greedy tail (from try -1) --- 
+seeds:
+designed:
+1111111111111111110001111011010101100111
+reversed:
+1110011010101101111000111111111111111111
+
+Real sensitivity = 0.930547
+time (since beginning): 0.784221
+
+ --- designed seeds and their reverses --- 
+designed:
+1111111111111111110001111011010101100111
+reversed:
+1110011010101101111000111111111111111111
+
+
+Best sensitivity is 0.930547
+
+Computed in 0.443598 seconds
+
+
+=== growing to 2 seeds; freezing 1 ===
+1111111111111111110001111011010101100111
+
+ALeS initial seed set is: 
+
+designed:
+1111111111111111110001111011010101100111
+1000011101111001001111111111111111111111
+reversed:
+1110011010101101111000111111111111111111
+1111111111111111111111001001111011100001
+
+Computed in 1.00887 seconds
+
+Real Sensitivity is 0.94988
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (2 threads).
+
+ --- random try number 1 --- 
+seeds:
+designed:
+1111111111111111110001111011010101100111
+01011111011001011101111111111111111111
+reversed:
+1110011010101101111000111111111111111111
+11111111111111111110111010011011111010
+
+Real sensitivity = 0.951157
+time (since beginning): 0.008713
+
+ --- random try number 10 --- 
+seeds:
+designed:
+1111111111111111110001111011010101100111
+1110110001110010111010111111111111111111
+reversed:
+1110011010101101111000111111111111111111
+1111111111111111110101110100111000110111
+
+Real sensitivity = 0.954098
+time (since beginning): 0.009098
+
+Target sensitivity 0.95 reached; stopping early.
+
+ --- designed seeds and their reverses --- 
+designed:
+1111111111111111110001111011010101100111
+1110110001110010111010111111111111111111
+reversed:
+1110011010101101111000111111111111111111
+1111111111111111110101110100111000110111
+
+
+Best sensitivity is 0.954098
+
+Computed in 0.009098 seconds
+
+Target met with 2 seed(s); not growing further.
+Total time (250 iterations): 1.02202 seconds

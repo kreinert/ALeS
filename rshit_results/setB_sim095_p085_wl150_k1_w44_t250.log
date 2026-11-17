@@ -1,0 +1,56 @@
+Stopping as soon as sensitivity 0.85 is reached.
+Restart budget reduced to 250 tries.
+Generating 1 seeds of weight 44 for similarity level 0.95 and length of homology region 150
+
+Every shape is a palindrome, so the set is already closed under reversal.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (10 threads).
+
+Cannot score some seed sets: the exact DP needs 2.04223 GB per thread but only 1.95883 GB is available, and the estimator only supports region length <= 128.
+Those sets are being skipped. The automaton grows like 2^(span - weight), so lower the seed length upper bound.
+
+ --- random try number 9 --- 
+seeds:
+1111011111111111111111111111111111111111101111
+
+Real sensitivity = 0.660798
+time (since beginning): 0.003877
+
+ --- random try number 17 --- 
+seeds:
+111111111011111111111011110111111111110111111111
+
+Real sensitivity = 0.8198
+time (since beginning): 0.008955
+
+ --- random try number 3 --- 
+seeds:
+10111001111110111111110011111111001111111101111110011101
+
+Real sensitivity = 0.834263
+time (since beginning): 0.148148
+
+ --- random try number 12 --- 
+seeds:
+10101101110111101111111101101000010110111111110111101110110101
+
+Real sensitivity = 0.854036
+time (since beginning): 7.7456
+
+ --- random try number 10 --- 
+seeds:
+10101101111011111111101010001111110001010111111111011110110101
+
+Real sensitivity = 0.86016
+time (since beginning): 7.95247
+
+Target sensitivity 0.85 reached; stopping early.
+
+Best sensitivity is 0.86016
+
+Computed in 7.95247 seconds
+
+Target met with 1 seed(s); not growing further.
+Total time (250 iterations): 8.28838 seconds

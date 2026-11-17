@@ -5,53 +5,91 @@ If you reach a seed with your desired sensitivity you can kill the program ...
 
 Parallel restarts enabled (4 threads).
 
- --- random try number 15 --- 
+ --- random try number 5 --- 
 seeds:
 1111111111111111111111111111111
 
 Real sensitivity = 0.285651
-time (since beginning): 0.000107
+time (since beginning): 0.000263
 
- --- random try number 5 --- 
+ --- random try number 15 --- 
 seeds:
-0111111111111111111111111101110111
+0111111111111111111111111111011100001
 
-Real sensitivity = 0.384956
-time (since beginning): 0.000134
+Real sensitivity = 0.346083
+time (since beginning): 0.001425
 
- --- random try number 8 --- 
+ --- random try number 10 --- 
 seeds:
-111111111111111111111111100100101010011
+110101000011111111111111111111111110011
 
-Real sensitivity = 0.403311
-time (since beginning): 0.006562
+Real sensitivity = 0.397257
+time (since beginning): 0.001955
 
- --- random try number 18 --- 
+ --- random try number 11 --- 
 seeds:
-111111111111111111111111100010101001011
-
-Real sensitivity = 0.404331
-time (since beginning): 0.009601
-
- --- random try number 34 --- 
-seeds:
-111111111111111111111111100001100101011
+110101001100001111111111111111111111111
 
 Real sensitivity = 0.404519
-time (since beginning): 0.065421
+time (since beginning): 0.003218
 
- --- random try number 333 --- 
+ --- random try number 719 --- 
 seeds:
-111111111111111111111111100010110111
+101101011001111111111111111111111111
 
-Real sensitivity = 0.406562
-time (since beginning): 0.252926
+Real sensitivity = 0.405141
+time (since beginning): 0.319201
+
+ --- greedy tail (from try 719) --- 
+seeds:
+110101011001111111111111111111111111
+
+Real sensitivity = 0.406369
+time (since beginning): 0.321168
+
+ --- random try number 759 --- 
+seeds:
+111111111111111111111111100110101011
+
+Real sensitivity = 0.406369
+time (since beginning): 0.33256
+
+ --- random try number 1415 --- 
+seeds:
+110110110001111111111111111111111111
+
+Real sensitivity = 0.407267
+time (since beginning): 0.535059
+
+ --- random try number 5589 --- 
+seeds:
+1101010110001111111111111111111111111
+
+Real sensitivity = 0.407863
+time (since beginning): 1.79016
+
+ --- random try number 5764 --- 
+seeds:
+1101101010001111111111111111111111111
+
+Real sensitivity = 0.408222
+time (since beginning): 1.8511
+
+ --- random try number 6303 --- 
+seeds:
+1111111111111111111111111000101011011
+
+Real sensitivity = 0.408222
+time (since beginning): 2.01382
 
  --- final polish --- 
-Polish findOptimal sensitivity = 0.406974
 
-Best sensitivity is 0.406974
+seeds:
+1111111111111111111111111000101011011
 
-Computed in 0.252926 seconds
 
-Total time (12000 iterations): 5.5889 seconds
+Best sensitivity is 0.408222
+
+Computed in 2.01382 seconds
+
+Total time (12000 iterations): 3.95376 seconds

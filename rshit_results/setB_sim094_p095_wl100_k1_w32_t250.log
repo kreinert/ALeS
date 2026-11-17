@@ -1,0 +1,87 @@
+Stopping as soon as sensitivity 0.95 is reached.
+Restart budget reduced to 250 tries.
+Generating 1 seeds of weight 32 for similarity level 0.94 and length of homology region 100
+
+Every shape is a palindrome, so the set is already closed under reversal.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (2 threads).
+
+ --- random try number 10 --- 
+seeds:
+1011011110101111111111111111010111101101
+
+Real sensitivity = 0.796215
+time (since beginning): 0.000551
+
+ --- random try number 0 --- 
+seeds:
+1101110111111111110000111111111110111011
+
+Real sensitivity = 0.837562
+time (since beginning): 0.000746
+
+ --- random try number 14 --- 
+seeds:
+1110110111111101011111101011111110110111
+
+Real sensitivity = 0.842698
+time (since beginning): 0.002541
+
+ --- random try number 15 --- 
+seeds:
+1111111100110111011111101110110011111111
+
+Real sensitivity = 0.847206
+time (since beginning): 0.00295
+
+ --- greedy tail (from try 15) --- 
+seeds:
+1111011110110111011111101110110111101111
+
+Real sensitivity = 0.85391
+time (since beginning): 0.006458
+
+ --- random try number 42 --- 
+seeds:
+1111110111101101111001111011011110111111
+
+Real sensitivity = 0.854826
+time (since beginning): 0.025555
+
+ --- random try number 44 --- 
+seeds:
+1111110101111101111001111011111010111111
+
+Real sensitivity = 0.857096
+time (since beginning): 0.02592
+
+ --- greedy tail (from try 44) --- 
+seeds:
+1111110111011101111001111011101110111111
+
+Real sensitivity = 0.860568
+time (since beginning): 0.034227
+
+ --- random try number 132 --- 
+seeds:
+1111111011111011101001011101111101111111
+
+Real sensitivity = 0.862677
+time (since beginning): 0.059596
+
+ --- greedy tail (from try 132) --- 
+seeds:
+1111111011111001101111011001111101111111
+
+Real sensitivity = 0.863464
+time (since beginning): 0.080747
+
+ --- final polish --- 
+
+Best sensitivity is 0.863464
+
+Computed in 0.059596 seconds
+
+Total time (250 iterations): 0.171538 seconds

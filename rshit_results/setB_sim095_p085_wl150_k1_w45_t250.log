@@ -1,0 +1,70 @@
+Stopping as soon as sensitivity 0.85 is reached.
+Restart budget reduced to 250 tries.
+Generating 1 seeds of weight 45 for similarity level 0.95 and length of homology region 150
+
+Every shape is a palindrome, so the set is already closed under reversal.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (10 threads).
+
+Cannot score some seed sets: the exact DP needs 2.46101 GB per thread but only 1.95883 GB is available, and the estimator only supports region length <= 128.
+Those sets are being skipped. The automaton grows like 2^(span - weight), so lower the seed length upper bound.
+
+ --- random try number 19 --- 
+seeds:
+111111111111111111111111111111111111111111111
+
+Real sensitivity = 0.548395
+time (since beginning): 0.003462
+
+ --- random try number 9 --- 
+seeds:
+11111111111111111111011111011111111111111111111
+
+Real sensitivity = 0.744664
+time (since beginning): 0.003641
+
+ --- random try number 5 --- 
+seeds:
+111011111111110110111111111111111011011111111110111
+
+Real sensitivity = 0.795662
+time (since beginning): 0.009481
+
+ --- random try number 3 --- 
+seeds:
+1111111010111100111111011111111101111110011110101111111
+
+Real sensitivity = 0.824877
+time (since beginning): 0.062176
+
+ --- random try number 10 --- 
+seeds:
+110010111101111110110110111100111001111011011011111101111010011
+
+Real sensitivity = 0.843984
+time (since beginning): 7.05121
+
+ --- greedy tail (from try 10) --- 
+seeds:
+101010111101111110110110111100111001111011011011111101111010101
+
+Real sensitivity = 0.846693
+time (since beginning): 8.25616
+
+ --- random try number 30 --- 
+seeds:
+101101111110010011111110011110111011110011111110010011111101101
+
+Real sensitivity = 0.851106
+time (since beginning): 87.1288
+
+Target sensitivity 0.85 reached; stopping early.
+
+Best sensitivity is 0.851106
+
+Computed in 87.1288 seconds
+
+Target met with 1 seed(s); not growing further.
+Total time (250 iterations): 87.17 seconds

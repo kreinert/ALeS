@@ -1,0 +1,41 @@
+RSHit: window 100, similarity 0.94, hit probability must exceed 0.95, at most 6 shapes
+
+=== Set A: longest m-core, palindromes forbidden, reverse-doubled ===
+weight 31 down to 15, window 100, similarity 0.94, need hit probability > 0.95, at most 6 gapped shapes plus their free reverses
+  weight 31 core  1 (250 tries) -> 0.9642 with 2 designed shape(s) ok
+  weight = 31
+  core ceiling at this window and similarity allows at most 20
+  weight 31 core 11 (250 tries) -> 0.9633 with 2 designed shape(s) ok
+  weight 31 core 16 (250 tries) -> 0.9584 with 2 designed shape(s) ok
+  weight 31 core 18 (250 tries) -> 0.9541 with 2 designed shape(s) ok
+  weight 31 core 19 (250 tries) -> 0.9517 with 2 designed shape(s) ok
+  weight 31 core 20 (250 tries) -> 0.9514 with 4 designed shape(s) ok
+  weight 31 carries core 20 (score 20.00)
+  weight 30 could at best score 19.75, so no lighter shape can beat 20.00; stopping the descent
+  balanced choice: core 20 at weight 31, needs 4 designed shape(s)
+  final run at core 20, 4 shape(s), full budget, no early exit
+  hit probability 0.9535 at span <= 40
+    1111111111111111111100001101100111010111  span=40 weight=31 core=20 palindrome=False
+    110111111110010011111111111111111111  span=36 weight=31 core=20 palindrome=False
+    1110001001110101110011111111111111111111  span=40 weight=31 core=20 palindrome=False
+    111110010100111001011111111111111111111  span=39 weight=31 core=20 palindrome=False
+    guaranteed m-core = 20
+    8 shape(s) in the index
+
+=== Set B: palindromic, m=1, fewest shapes ===
+weight 32 down to 15, window 100, similarity 0.94, need hit probability > 0.95
+  k=1 weight 32 (250 tries) -> 0.8635 short
+  k=1 weight 15 (250 tries) -> 1.0000 ok
+  k=1 weight 23 (250 tries) -> 0.9899 ok
+  k=1 weight 27 (250 tries) -> 0.9590 ok
+  k=1 weight 29 (250 tries) -> 0.9293 short
+  k=1 weight 28 (250 tries) -> 0.9477 short
+  bisection says weight 27; re-checking 28..29 with 800 tries
+  k=1 weight 28 (800 tries) -> 0.9477 short
+  k=1 weight 29 (800 tries) -> 0.9295 short
+  1 palindromic shape(s), weight 27
+  final run at weight 27, 1 shape(s), full budget, no early exit
+  hit probability 0.9598 at span <= 40
+    111101110101101110010011101101011101111  span=39 weight=27 core=4 palindrome=True
+    guaranteed m-core = 4
+    1 shape(s) in the index

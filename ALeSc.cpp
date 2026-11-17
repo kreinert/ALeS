@@ -1592,7 +1592,7 @@ double polish_global_best(char** globalBest, int* globalBestLen, int nSeeds, int
 	return bestSens;
 }
 
-void init_seeds_with_core(int weight, int* length, char** seeds, int nSeeds)
+void init_seeds_with_core(int weight, int* length, char** seeds, int nSeeds, int perm = -1)
 {
 	if (require_palindrome) {
 		for (int i = 0; i < nSeeds; i++)
@@ -1602,7 +1602,12 @@ void init_seeds_with_core(int weight, int* length, char** seeds, int nSeeds)
 	for (int i = 0; i < nSeeds; i++) {
 		for (int j = 0; j < length[i]; j++)
 			seeds[i][j] = '0';
-		int start = (length[i] < cl) ? 0 : (ale_rand() % (length[i] - cl + 1));
+		int slots = length[i] - cl + 1;
+		if (slots < 1)
+			slots = 1;
+		// Sweep legal core placements across restarts instead of relying only on
+		// random offsets. Flank positions remain randomized below.
+		int start = (perm >= 0) ? (perm % slots) : (ale_rand() % slots);
 		for (int j = start; j < start + cl; ++j)
 			seeds[i][j] = '1';
 		seeds[i][length[i] - 1] = '1';
@@ -1650,7 +1655,7 @@ void init_seeds_spread_cores(int weight, int* length, char** seeds, int nSeeds, 
 			else start = slots / 2;
 		}
 		else if (nSeeds <= 1)
-			start = 0;
+			start = (perm >= 0) ? (perm % slots) : 0;
 		else
 			start = (bin * (slots - 1)) / (nSeeds - 1);
 		if (start < 0) start = 0;
@@ -3035,7 +3040,7 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 				else if (k % 2 == 0)
 					init_seeds_spread_cores(weight, localLen, localSeeds, nSeeds, k);
 				else
-					init_seeds_with_core(weight, localLen, localSeeds, nSeeds);
+					init_seeds_with_core(weight, localLen, localSeeds, nSeeds, k);
 			}
 
 			// OC on most random inits; skip after crossover so mixed seeds stay intact

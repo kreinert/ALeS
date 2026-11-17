@@ -1,0 +1,51 @@
+Stopping as soon as sensitivity 0.95 is reached.
+Restart budget reduced to 600 tries.
+Generating 1 seeds of weight 19 for similarity level 0.9 and length of homology region 100
+
+Every shape is a palindrome, so the set is already closed under reversal.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (10 threads).
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating array to estimate sensitivity ...
+
+ --- random try number 16 --- 
+seeds:
+111010110000100110010011001000011010111
+
+Estimated sensitivity = 0.965609
+
+time (since beginning): 67.6258
+
+ --- random try number 12 --- 
+seeds:
+111100110010001010010010100010011001111
+
+Estimated sensitivity = 0.965891
+
+time (since beginning): 67.6654
+
+ --- random try number 4 --- 
+seeds:
+111101010000110010010010011000010101111
+
+Estimated sensitivity = 0.965955
+
+time (since beginning): 67.6836
+
+Target sensitivity 0.95 reached; stopping early.
+
+seeds:
+111101010000110010010010011000010101111
+
+
+Best sensitivity is 0.965955
+
+Computed in 67.6836 seconds
+
+Target met with 1 seed(s); not growing further.
+Total time (600 iterations): 76.8226 seconds

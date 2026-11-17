@@ -1,0 +1,108 @@
+Stopping as soon as sensitivity 0.85 is reached.
+Restart budget reduced to 250 tries.
+Generating 1 seeds of weight 46 for similarity level 0.95 and length of homology region 150
+
+Every shape is a palindrome, so the set is already closed under reversal.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (10 threads).
+
+ --- random try number 0 --- 
+seeds:
+10101111100111110111011010111111111101011011101111100111110101
+
+Real sensitivity = 0.818714
+time (since beginning): 5.27283
+
+ --- random try number 16 --- 
+seeds:
+10100111111111101011111110011011011001111111010111111111100101
+
+Real sensitivity = 0.823883
+time (since beginning): 5.30096
+
+ --- random try number 10 --- 
+seeds:
+11111011001111011101101110110111101101110110111011110011011111
+
+Real sensitivity = 0.831752
+time (since beginning): 7.73597
+
+ --- random try number 2 --- 
+seeds:
+11110111111101010111011011101011010111011011101010111111101111
+
+Real sensitivity = 0.84025
+time (since beginning): 8.00981
+
+ --- greedy tail (from try 2) --- 
+seeds:
+11110111101101010111011011111011011111011011101010110111101111
+
+Real sensitivity = 0.841421
+time (since beginning): 24.1641
+
+ --- random try number 48 --- 
+seeds:
+11111011111110111101001011101011010111010010111101111111011111
+
+Real sensitivity = 0.84173
+time (since beginning): 67.693
+
+ --- greedy tail (from try 48) --- 
+seeds:
+11111001111110111101101011101011010111010110111101111110011111
+
+Real sensitivity = 0.842876
+time (since beginning): 76.7326
+
+ --- random try number 144 --- 
+seeds:
+11111011110101111111011011010011001011011011111110101111011111
+
+Real sensitivity = 0.844207
+time (since beginning): 159.8
+
+ --- random try number 150 --- 
+seeds:
+11111110111111100011110111010011001011101111000111111101111111
+
+Real sensitivity = 0.84563
+time (since beginning): 161.064
+
+ --- greedy tail (from try 150) --- 
+seeds:
+11111110101111101011110111010011001011101111010111110101111111
+
+Real sensitivity = 0.84683
+time (since beginning): 177.542
+
+ --- local search step 24 (from try 150) --- 
+seeds:
+11111110111110101100111111010011001011111100110101111101111111
+
+Real sensitivity = 0.848838
+time (since beginning): 206.485
+
+ --- final polish --- 
+
+ --- greedy tail (from try -1) --- 
+seeds:
+11111110111110101100111011010111101011011100110101111101111111
+
+Real sensitivity = 0.849251
+time (since beginning): 312.654
+
+ --- greedy tail (from try -1) --- 
+seeds:
+11111110111110101100111111010100101011111100110101111101111111
+
+Real sensitivity = 0.849645
+time (since beginning): 327.903
+
+Best sensitivity is 0.849645
+
+Computed in 161.064 seconds
+
+Total time (250 iterations): 371.091 seconds

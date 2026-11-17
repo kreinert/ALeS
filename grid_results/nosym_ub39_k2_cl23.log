@@ -4,61 +4,51 @@ Generating 2 seeds of weight 31 for similarity level 0.9 and length of homology 
 Growing from 1 core-frozen seed(s); flanks may still move.
 ALeS initial seed set is: 
 
-111111111111111111111110001101010011011
-111001101010010011111111111111111111111
+11111111111111111111111000110101011011
+111001100101010011111111111111111111111
 
-Computed in 0.0002 seconds
+Computed in 0.00092 seconds
 
-Real Sensitivity is 0.54928
+Real Sensitivity is 0.548426
 
 The program starts computing better seeds ...
 If you reach a set of seeds with your desired sensitivity you can kill the program ... 
 Parallel restarts enabled (4 threads).
 
- --- random try number 12 --- 
+ --- random try number 16 --- 
 seeds:
-111111111111111111111110001101010011011
+11111111111111111111111000110101011011
+110101011001100011111111111111111111111
+
+Real sensitivity = 0.549354
+time (since beginning): 0.00614
+
+ --- random try number 18 --- 
+seeds:
+11111111111111111111111000110101011011
 110110010101100011111111111111111111111
 
-Real sensitivity = 0.549955
-time (since beginning): 0.017135
+Real sensitivity = 0.549715
+time (since beginning): 0.014678
 
- --- local search step 2 (from try 12) --- 
+ --- random try number 8 --- 
 seeds:
-111111111111111111111110001101010011011
-110110011010100011111111111111111111111
-
-Real sensitivity = 0.550069
-time (since beginning): 0.156415
-
- --- local search step 22 (from try 12) --- 
-seeds:
-111111111111111111111110001101010011011
-110110101001100011111111111111111111111
-
-Real sensitivity = 0.550114
-time (since beginning): 0.203995
-
- --- local search step 42 (from try 12) --- 
-seeds:
-111111111111111111111110001101010011011
+11111111111111111111111000110101011011
 110101100110100011111111111111111111111
 
-Real sensitivity = 0.550274
-time (since beginning): 0.254629
-
- --- random try number 2629 --- 
-seeds:
-111111111111111111111110001100101011011
-110101100110100011111111111111111111111
-
-Real sensitivity = 0.550419
-time (since beginning): 3.05099
+Real sensitivity = 0.549909
+time (since beginning): 0.017414
 
  --- final polish --- 
+Polish findOptimal sensitivity = 0.550274
 
-Best sensitivity is 0.550419
+seeds:
+111111111111111111111110001101010011011
+110101100110100011111111111111111111111
 
-Computed in 3.05099 seconds
 
-Total time (12000 iterations): 13.4301 seconds
+Best sensitivity is 0.550274
+
+Computed in 0.017414 seconds
+
+Total time (12000 iterations): 12.8924 seconds

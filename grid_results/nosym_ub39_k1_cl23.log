@@ -5,46 +5,78 @@ If you reach a seed with your desired sensitivity you can kill the program ...
 
 Parallel restarts enabled (4 threads).
 
- --- random try number 15 --- 
-seeds:
-01111011111111111111111111111111001
-
-Real sensitivity = 0.355732
-time (since beginning): 0.000155
-
  --- random try number 5 --- 
 seeds:
-01101011111111111111111111111011100011
+110101111111111111111111111111111
 
-Real sensitivity = 0.391718
-time (since beginning): 0.000489
+Real sensitivity = 0.344907
+time (since beginning): 0.000331
 
- --- random try number 0 --- 
+ --- random try number 15 --- 
 seeds:
-111111111111111111111110010010101100111
+101000010110011111111111111111111111111
 
-Real sensitivity = 0.442289
-time (since beginning): 0.004256
+Real sensitivity = 0.37741
+time (since beginning): 0.000844
+
+ --- random try number 17 --- 
+seeds:
+11101111111111111111111111101101011
+
+Real sensitivity = 0.399637
+time (since beginning): 0.001655
 
  --- random try number 10 --- 
 seeds:
-111111111111111111111110010011010100111
+110101001111111111111111111111100011011
 
-Real sensitivity = 0.442565
-time (since beginning): 0.005012
+Real sensitivity = 0.42864
+time (since beginning): 0.001989
 
- --- random try number 16 --- 
+ --- random try number 11 --- 
+seeds:
+110001111111111111111111111101010011011
+
+Real sensitivity = 0.430582
+time (since beginning): 0.004092
+
+ --- random try number 12 --- 
+seeds:
+111001101010010011111111111111111111111
+
+Real sensitivity = 0.442289
+time (since beginning): 0.004446
+
+ --- random try number 0 --- 
+seeds:
+111111111111111111111110001100101011011
+
+Real sensitivity = 0.444811
+time (since beginning): 0.005293
+
+ --- random try number 62 --- 
+seeds:
+110110010101100011111111111111111111111
+
+Real sensitivity = 0.444972
+time (since beginning): 0.103902
+
+ --- random try number 102 --- 
 seeds:
 111111111111111111111110001101010011011
 
 Real sensitivity = 0.444972
-time (since beginning): 0.005241
+time (since beginning): 0.135091
 
  --- final polish --- 
 Polish findOptimal sensitivity = 0.445393
 
+seeds:
+11111111111111111111111000110101011011
+
+
 Best sensitivity is 0.445393
 
-Computed in 0.005241 seconds
+Computed in 0.135091 seconds
 
-Total time (12000 iterations): 5.8518 seconds
+Total time (12000 iterations): 5.5227 seconds

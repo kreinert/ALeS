@@ -5,36 +5,49 @@ Growing from 1 core-frozen seed(s); flanks may still move.
 ALeS initial seed set is: 
 
 111111111111111111111000110101011011011
-111010110101100100111111111111111111111
+111010110010101100111111111111111111111
 
-Computed in 0.000328 seconds
+Computed in 0.000687 seconds
 
-Real Sensitivity is 0.599172
+Real Sensitivity is 0.597626
 
 The program starts computing better seeds ...
 If you reach a set of seeds with your desired sensitivity you can kill the program ... 
 Parallel restarts enabled (4 threads).
 
- --- random try number 92 --- 
+ --- random try number 4 --- 
 seeds:
 111111111111111111111000110101011011011
-110110101011011000111111111111111111111
+111010101101001100111111111111111111111
 
-Real sensitivity = 0.599975
-time (since beginning): 0.109645
+Real sensitivity = 0.598529
+time (since beginning): 0.030711
 
- --- random try number 800 --- 
+ --- greedy tail (from try 4) --- 
+seeds:
+111111111111111111111000110101011011011
+111010101101101000111111111111111111111
+
+Real sensitivity = 0.599569
+time (since beginning): 0.178769
+
+ --- random try number 90 --- 
 seeds:
 111111111111111111111000110101011011011
 110110110101011000111111111111111111111
 
 Real sensitivity = 0.600337
-time (since beginning): 0.900167
+time (since beginning): 0.404854
 
  --- final polish --- 
 
+seeds:
+111111111111111111111000110101011011011
+110110110101011000111111111111111111111
+
+
 Best sensitivity is 0.600337
 
-Computed in 0.900167 seconds
+Computed in 0.404854 seconds
 
-Total time (12000 iterations): 12.7264 seconds
+Total time (12000 iterations): 22.6559 seconds

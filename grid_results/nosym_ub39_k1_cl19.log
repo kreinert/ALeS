@@ -5,66 +5,77 @@ If you reach a seed with your desired sensitivity you can kill the program ...
 
 Parallel restarts enabled (4 threads).
 
- --- random try number 5 --- 
-seeds:
-111011111111111111111111111101111
-
-Real sensitivity = 0.377032
-time (since beginning): 0.000421
-
  --- random try number 15 --- 
 seeds:
-01011111111111111111111111001100011111
+01001011111111111111111111111111111
 
-Real sensitivity = 0.423465
-time (since beginning): 0.000922
+Real sensitivity = 0.318801
+time (since beginning): 0.000645
 
- --- random try number 17 --- 
+ --- random try number 5 --- 
 seeds:
-11111010011101111111111111111111111
+11000111111111111111111101111101101011
 
-Real sensitivity = 0.445433
-time (since beginning): 0.001473
-
- --- random try number 0 --- 
-seeds:
-111111111111111111101010011101101100111
-
-Real sensitivity = 0.49317
-time (since beginning): 0.004556
+Real sensitivity = 0.445333
+time (since beginning): 0.001891
 
  --- random try number 10 --- 
 seeds:
-111111111111111111100110011011010101111
+011110101111111111111111111001101011011
 
-Real sensitivity = 0.495292
-time (since beginning): 0.004823
+Real sensitivity = 0.466029
+time (since beginning): 0.005585
 
- --- random try number 18 --- 
+ --- random try number 16 --- 
 seeds:
-111111111111111111100110110101101010111
+111010110110011101001111111111111111111
 
-Real sensitivity = 0.496291
-time (since beginning): 0.00639
+Real sensitivity = 0.497244
+time (since beginning): 0.006647
 
  --- random try number 2 --- 
 seeds:
-111111111111111111100101110110101100111
+111111111111111111100101110011011010111
 
-Real sensitivity = 0.497197
-time (since beginning): 0.007553
+Real sensitivity = 0.497244
+time (since beginning): 0.020527
 
  --- greedy tail (from try 2) --- 
+seeds:
+111111111111111111100001110111011010111
+
+Real sensitivity = 0.498326
+time (since beginning): 0.030568
+
+ --- final polish --- 
+
+ --- greedy tail (from try -1) --- 
+seeds:
+111111111111111111100001110111010110111
+
+Real sensitivity = 0.498606
+time (since beginning): 6.06199
+
+ --- local search step 13 (from try -1) --- 
+seeds:
+111111111111111111100101110010101110111
+
+Real sensitivity = 0.498968
+time (since beginning): 6.16921
+
+ --- local search step 33 (from try -1) --- 
 seeds:
 111111111111111111100001110110101110111
 
 Real sensitivity = 0.499005
-time (since beginning): 0.015769
+time (since beginning): 6.22676
 
- --- final polish --- 
+seeds:
+111111111111111111100001110110101110111
+
 
 Best sensitivity is 0.499005
 
-Computed in 0.007553 seconds
+Computed in 0.020527 seconds
 
-Total time (12000 iterations): 5.23042 seconds
+Total time (12000 iterations): 6.30537 seconds

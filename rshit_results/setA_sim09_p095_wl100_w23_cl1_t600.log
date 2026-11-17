@@ -1,0 +1,153 @@
+Stopping as soon as sensitivity 0.95 is reached.
+Restart budget reduced to 600 tries.
+Generating 4 seeds of weight 23 for similarity level 0.9 and length of homology region 100
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+Rejecting palindromes and mutual reverses, so all shapes stay distinct.
+Successive construction: grow from 1 to 4 seeds.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (10 threads).
+
+ --- random try number 14 --- 
+seeds:
+designed:
+011101011100110001010101101101001011111
+reversed:
+111110100101101101010100011001110101110
+
+Real sensitivity = 0.929932
+time (since beginning): 2.42185
+
+ --- random try number 6 --- 
+seeds:
+designed:
+011100100101100101110001101010110111111
+reversed:
+111111011010101100011101001101001001110
+
+Real sensitivity = 0.93027
+time (since beginning): 3.16775
+
+ --- random try number 18 --- 
+seeds:
+designed:
+111010110100101011100001101100110011111
+reversed:
+111110011001101100001110101001011010111
+
+Real sensitivity = 0.940035
+time (since beginning): 5.36876
+
+ --- random try number 2 --- 
+seeds:
+designed:
+111110000101011010100110100110111100111
+reversed:
+111001111011001011001010110101000011111
+
+Real sensitivity = 0.940797
+time (since beginning): 5.67642
+
+ --- random try number 4 --- 
+seeds:
+designed:
+110111101001001001101010011101110001111
+reversed:
+111100011101110010101100100100101111011
+
+Real sensitivity = 0.94118
+time (since beginning): 5.74695
+
+ --- random try number 0 --- 
+seeds:
+designed:
+111010111100001010100110110110001101111
+reversed:
+111101100011011011001010100001111010111
+
+Real sensitivity = 0.941751
+time (since beginning): 5.82052
+
+ --- random try number 40 --- 
+seeds:
+designed:
+111110110010011000010111010110101100111
+reversed:
+111001101011010111010000110010011011111
+
+Real sensitivity = 0.942134
+time (since beginning): 59.3461
+
+ --- random try number 532 --- 
+seeds:
+designed:
+111011010011010010001101110011010101111
+reversed:
+111101010110011101100010010110010110111
+
+Real sensitivity = 0.9422
+time (since beginning): 311.238
+
+ --- random try number 544 --- 
+seeds:
+designed:
+111101010111000100011010110100110110111
+reversed:
+111011011001011010110001000111010101111
+
+Real sensitivity = 0.942627
+time (since beginning): 370.955
+
+ --- final polish --- 
+
+seeds:
+designed:
+111101010111000100011010110100110110111
+reversed:
+111011011001011010110001000111010101111
+
+
+Best sensitivity is 0.942627
+
+Computed in 370.955 seconds
+
+
+=== growing to 2 seeds; freezing 1 ===
+111101010111000100011010110100110110111
+
+ALeS initial seed set is: 
+
+designed:
+111101010111000100011010110100110110111
+011111000101010111100011011011001110011
+reversed:
+111011011001011010110001000111010101111
+110011100110110110001111010101000111110
+
+Computed in 502.816 seconds
+
+Real Sensitivity is 0.972146
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (10 threads).
+
+Target sensitivity 0.95 reached; stopping early.
+
+seeds:
+designed:
+111101010111000100011010110100110110111
+011111000101010111100011011011001110011
+reversed:
+111011011001011010110001000111010101111
+110011100110110110001111010101000111110
+
+
+Best sensitivity is 0.972146
+
+Computed in 0 seconds
+
+Target met with 2 seed(s); not growing further.
+Total time (600 iterations): 504.392 seconds
