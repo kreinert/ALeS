@@ -3481,9 +3481,9 @@ int main(int argc, char **argv)
 	}catch(std::bad_alloc){
 		cerr << "Memory error (Allocation failed)"<<endl
 		<<"You probably need more memory to run this program"<<endl;
+		return 1;
 	}
 	ttime[1] = clock()/ 1000000.0; 
 	cout << "Total time (" << max_tries << " iterations): " << ttime[1]-ttime[0]<< " seconds" << endl;
 	return 0;
 }
-
