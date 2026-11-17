@@ -1,0 +1,16 @@
+k=1 cl=19 ub=54 N=100 best=0.641251 nSeeds=1 time=4.2s rc=0
+k=1 cl=21 ub=54 N=100 best=0.604301 nSeeds=1 time=5.0s rc=0
+k=1 cl=23 ub=54 N=100 best=0.550335 nSeeds=1 time=7.5s rc=0
+k=1 cl=25 ub=54 N=100 best=0.486301 nSeeds=1 time=7.4s rc=0
+k=2 cl=19 ub=54 N=100 best=0.723751 nSeeds=2 time=12.1s rc=0
+k=2 cl=21 ub=54 N=100 best=0.668949 nSeeds=2 time=17.0s rc=0
+k=2 cl=23 ub=54 N=100 best=0.591412 nSeeds=2 time=23.0s rc=0
+k=2 cl=25 ub=54 N=100 best=0.511242 nSeeds=2 time=19.6s rc=0
+k=3 cl=19 ub=54 N=100 best=0.756561 nSeeds=3 time=41.5s rc=0
+k=3 cl=21 ub=54 N=100 best=0.690578 nSeeds=3 time=43.9s rc=0
+k=3 cl=23 ub=54 N=100 best=0.608437 nSeeds=3 time=83.1s rc=0
+k=3 cl=25 ub=54 N=100 best=0.519905 nSeeds=3 time=54.5s rc=0
+k=4 cl=19 ub=54 N=100 best=0.773865 nSeeds=4 time=107.0s rc=0
+k=4 cl=21 ub=54 N=100 best=0.701469 nSeeds=4 time=107.2s rc=0
+k=4 cl=23 ub=54 N=100 best=0.614811 nSeeds=4 time=111.1s rc=0
+k=4 cl=25 ub=54 N=100 best=0.522438 nSeeds=4 time=89.6s rc=0

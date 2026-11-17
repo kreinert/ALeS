@@ -1,0 +1,101 @@
+Restart budget reduced to 100 tries.
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+ --- random try number 5 --- 
+seeds:
+designed:
+110101111111111111111111110110111011
+reversed:
+110111011011111111111111111111101011
+
+Real sensitivity = 0.492301
+time (since beginning): 0.000268
+
+ --- random try number 15 --- 
+seeds:
+designed:
+11001111111110011111111111111111110001
+reversed:
+10001111111111111111111001111111110011
+
+Real sensitivity = 0.526018
+time (since beginning): 0.000422
+
+ --- random try number 17 --- 
+seeds:
+designed:
+10111100101100111111111111111111111101
+reversed:
+10111111111111111111111100110100111101
+
+Real sensitivity = 0.544762
+time (since beginning): 0.001065
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating 262144 QMC windows to estimate sensitivity ...
+
+ --- random try number 0 --- 
+seeds:
+designed:
+111111111111111111100010001010010101000011000010010011
+reversed:
+110010010000110000101010010100010001111111111111111111
+
+Estimated sensitivity = 0.637245
+
+time (since beginning): 0.095596
+
+ --- greedy tail (from try 0) --- 
+seeds:
+designed:
+111111111111111111100001001010010101000011000010010011
+reversed:
+110010010000110000101010010100100001111111111111111111
+
+Real sensitivity = 0.637775
+time (since beginning): 0.313963
+
+ --- local search step 27 (from try 0) --- 
+seeds:
+designed:
+1111111111111111111000010010010101010001100010010011
+reversed:
+1100100100011000101010100100100001111111111111111111
+
+Estimated sensitivity = 0.640121
+
+time (since beginning): 1.11438
+
+ --- final polish --- 
+
+ --- greedy tail (from try -1) --- 
+seeds:
+designed:
+1111111111111111111000001010010101010001100010010011
+reversed:
+1100100100011000101010100101000001111111111111111111
+
+Real sensitivity = 0.64016
+time (since beginning): 2.52891
+Polish findOptimal sensitivity = 0.641251
+
+seeds:
+designed:
+1111111111111111111000001011000101000110010010100011
+reversed:
+1100010100100110001010001101000001111111111111111111
+
+
+Best sensitivity is 0.641251
+
+Computed in 0.095596 seconds
+
+Total time (100 iterations): 4.61096 seconds

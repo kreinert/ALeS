@@ -1,0 +1,80 @@
+Restart budget reduced to 100 tries.
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Scoring designed seeds together with their reverses; OC uses the doubled set.
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating 262144 QMC windows to estimate sensitivity ...
+
+ --- random try number 15 --- 
+seeds:
+designed:
+10110001000001011111111111111111111111111
+reversed:
+11111111111111111111111111010000010001101
+
+Real sensitivity = 0.443962
+time (since beginning): 0.009974
+
+ --- random try number 0 --- 
+seeds:
+designed:
+111111111111111111111111100000100000100010000100001001
+reversed:
+100100001000010001000001000001111111111111111111111111
+
+Estimated sensitivity = 0.483982
+
+time (since beginning): 0.163292
+
+ --- greedy tail (from try 0) --- 
+seeds:
+designed:
+111111111111111111111111100000010000100010000100001001
+reversed:
+100100001000010001000010000001111111111111111111111111
+
+Real sensitivity = 0.484055
+time (since beginning): 1.41199
+
+ --- local search step 0 (from try 0) --- 
+seeds:
+designed:
+1111111111111111111111111000001000100010000100001001
+reversed:
+1001000010000100010001000001111111111111111111111111
+
+Estimated sensitivity = 0.486153
+
+time (since beginning): 2.79322
+
+ --- final polish --- 
+
+ --- greedy tail (from try -1) --- 
+seeds:
+designed:
+1111111111111111111111111000001000100010000100100001
+reversed:
+1000010010000100010001000001111111111111111111111111
+
+Real sensitivity = 0.486301
+time (since beginning): 6.09863
+
+seeds:
+designed:
+1111111111111111111111111000001000100010000100100001
+reversed:
+1000010010000100010001000001111111111111111111111111
+
+
+Best sensitivity is 0.486301
+
+Computed in 0.163292 seconds
+
+Total time (100 iterations): 8.8441 seconds

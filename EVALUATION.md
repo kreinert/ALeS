@@ -66,3 +66,25 @@ feasibility target, raise `ALESC_EST_SAMPLES` back up for the final verification
 | 21 (sym) | 0.5989 | 0.6487 | 0.6738 | 0.6854 |
 | 23 (sym) | 0.5501 | 0.5845 | 0.5996 | 0.6055 |
 | 25 (sym) | 0.4871 | 0.5100 | 0.5152 | 0.5179 |
+
+## Grid with upperBound = 54
+
+Same grid, 100 tries, `OMP_NUM_THREADS=4`, 32 configs, 1139 s total. Scoring mostly
+uses the QMC estimator (exact DP cannot fit these automata), which is why each run
+takes 2–107 s rather than ~1 s. The startup rejection was relaxed for `N <= 128`
+since the estimator can score those sets. Output in `grid_results_ub54/`.
+
+| core \ k | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| 19 (no sym) | 0.5024 | 0.6422 | 0.6922 | 0.7211 |
+| 21 (no sym) | 0.4772 | 0.6026 | 0.6395 | 0.6696 |
+| 23 (no sym) | 0.4454 | 0.5510 | 0.5773 | 0.5960 |
+| 25 (no sym) | 0.4070 | 0.4880 | 0.5026 | 0.5135 |
+| 19 (sym) | 0.6413 | 0.7238 | 0.7566 | 0.7739 |
+| 21 (sym) | 0.6043 | 0.6689 | 0.6906 | 0.7015 |
+| 23 (sym) | 0.5503 | 0.5914 | 0.6084 | 0.6148 |
+| 25 (sym) | 0.4863 | 0.5112 | 0.5199 | 0.5224 |
+
+Delta vs `ub=39` (mean +0.0089): without symmetry the gain grows with `k`, up to
++0.0292 at `k=4, core=19`; with symmetry every cell was already at its ub=39 value,
+so the longer span added nothing there.

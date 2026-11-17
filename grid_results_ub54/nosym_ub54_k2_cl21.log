@@ -1,0 +1,77 @@
+Restart budget reduced to 100 tries.
+Using 1 frozen seed(s).
+Generating 2 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Growing from 1 core-frozen seed(s); flanks may still move.
+ALeS initial seed set is: 
+
+110110110101011000111111111111111111111
+111111111111111111111000010010001001000011000010010101
+
+Computed in 0.000653 seconds
+
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating 262144 QMC windows to estimate sensitivity ...
+Estimated Sensitivity is 0.596596
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (4 threads).
+
+ --- random try number 10 --- 
+seeds:
+110110110101011000111111111111111111111
+111111111111111111111000001001001000100011000010010101
+
+Estimated sensitivity = 0.597717
+
+time (since beginning): 0.040037
+
+ --- greedy tail (from try 10) --- 
+seeds:
+110110110101011000111111111111111111111
+111111111111111111111000001001001000110001000010010101
+
+Real sensitivity = 0.597797
+time (since beginning): 1.41759
+
+ --- random try number 25 --- 
+seeds:
+110110110101011000111111111111111111111
+11111111111111111111100010110111000101101
+
+Real sensitivity = 0.599066
+time (since beginning): 2.39777
+
+ --- greedy tail (from try 25) --- 
+seeds:
+110110110101011000111111111111111111111
+11111111111111111111100000110111010101101
+
+Real sensitivity = 0.599076
+time (since beginning): 2.76895
+
+ --- local search step 3 (from try 25) --- 
+seeds:
+110110110101011000111111111111111111111
+11111111111111111111100001101010110011011
+
+Real sensitivity = 0.601847
+time (since beginning): 3.29345
+
+ --- final polish --- 
+Polish findOptimal sensitivity = 0.602553
+
+seeds:
+11011010101100110000111111111111111111111
+111111111111111111111000101010010110011011
+
+
+Best sensitivity is 0.602553
+
+Computed in 2.39777 seconds
+
+Total time (100 iterations): 7.39008 seconds

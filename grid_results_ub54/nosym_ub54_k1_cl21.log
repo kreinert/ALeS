@@ -1,0 +1,83 @@
+Restart budget reduced to 100 tries.
+Generating 1 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+The program starts computing ...
+If you reach a seed with your desired sensitivity you can kill the program ... 
+
+Parallel restarts enabled (4 threads).
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating 262144 QMC windows to estimate sensitivity ...
+
+ --- random try number 15 --- 
+seeds:
+01101100000110011111111111111111111110100011
+
+Real sensitivity = 0.426579
+time (since beginning): 0.007525
+
+ --- random try number 0 --- 
+seeds:
+111111111111111111111000100100010010100010000110000101
+
+Estimated sensitivity = 0.431843
+
+time (since beginning): 0.135004
+
+ --- random try number 11 --- 
+seeds:
+011111111111111111111100000100110000101010000110001001
+
+Estimated sensitivity = 0.432178
+
+time (since beginning): 0.1603
+
+ --- random try number 19 --- 
+seeds:
+111111111111111111111000111000111011101
+
+Real sensitivity = 0.455962
+time (since beginning): 0.200321
+
+ --- greedy tail (from try 19) --- 
+seeds:
+111111111111111111111010011000111011101
+
+Real sensitivity = 0.464515
+time (since beginning): 1.71123
+
+ --- local search step 0 (from try 19) --- 
+seeds:
+01111111111111111111110001010110100110111
+
+Real sensitivity = 0.47052
+time (since beginning): 1.8484
+
+ --- local search step 7 (from try 19) --- 
+seeds:
+1111111111111111111110001010110100110111
+
+Real sensitivity = 0.47562
+time (since beginning): 1.95706
+
+ --- random try number 55 --- 
+seeds:
+1110101011010011000111111111111111111111
+
+Real sensitivity = 0.475628
+time (since beginning): 1.99886
+
+ --- final polish --- 
+Polish findOptimal sensitivity = 0.477175
+
+seeds:
+110110110101011000111111111111111111111
+
+
+Best sensitivity is 0.477175
+
+Computed in 1.99886 seconds
+
+Total time (100 iterations): 3.22123 seconds

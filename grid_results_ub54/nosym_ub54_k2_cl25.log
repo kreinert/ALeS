@@ -1,0 +1,76 @@
+Restart budget reduced to 100 tries.
+Using 1 frozen seed(s).
+Generating 2 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Growing from 1 core-frozen seed(s); flanks may still move.
+ALeS initial seed set is: 
+
+1110101001001111111111111111111111111
+010100010001001000000000100001111111111111111111111111
+
+Computed in 0.000737 seconds
+
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating 262144 QMC windows to estimate sensitivity ...
+Estimated Sensitivity is 0.440815
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (4 threads).
+
+ --- random try number 15 --- 
+seeds:
+1110101001001111111111111111111111111
+111111111111111111111111101110111
+
+Real sensitivity = 0.474262
+time (since beginning): 0.00023
+
+ --- random try number 7 --- 
+seeds:
+1110101001001111111111111111111111111
+111111111111111111111111100100010010111
+
+Real sensitivity = 0.483864
+time (since beginning): 0.05005
+
+ --- random try number 3 --- 
+seeds:
+1110101001001111111111111111111111111
+111111111111111111111111100011010010001001
+
+Real sensitivity = 0.485149
+time (since beginning): 0.110264
+
+ --- greedy tail (from try 3) --- 
+seeds:
+1110101001001111111111111111111111111
+111111111111111111111111100001010110001001
+
+Real sensitivity = 0.485475
+time (since beginning): 0.284614
+
+ --- local search step 13 (from try 3) --- 
+seeds:
+1110101001001111111111111111111111111
+11111111111111111111111110000101010010011
+
+Real sensitivity = 0.486276
+time (since beginning): 0.912333
+
+ --- final polish --- 
+Polish findOptimal sensitivity = 0.487998
+
+seeds:
+11001010100100001111111111111111111111111
+11111111111111111111111110000101010010011
+
+
+Best sensitivity is 0.487998
+
+Computed in 0.110264 seconds
+
+Total time (100 iterations): 5.45934 seconds

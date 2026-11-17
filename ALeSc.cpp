@@ -3248,11 +3248,11 @@ void ALeS(char** S){
 		
 	cout<<"Generating "<< k << " seeds of weight "<<w<<" for similarity level "<< p <<" and length of homology region "<< N<<endl<<endl;
 
-	// The DP automaton grows like 2^(span - weight). Refuse up front rather than search a
-	// space whose sets cannot be scored. This applies at every region length: for N <= 128
-	// the estimator can stand in for the exact DP, but the automaton is built before that
-	// fallback is reached, so an unaffordable span still gets the process killed.
-	{
+	// The DP automaton grows like 2^(span - weight). For N > 128 there is no scoring
+	// fallback, so refuse an unaffordable span up front. For N <= 128 the (now cheap)
+	// QMC estimator stands in whenever the exact automaton does not fit, so long
+	// spans remain searchable.
+	if (N > 128) {
 		int nShapes = require_symmetry ? (k * 2) : k;
 		int affordable = max_affordable_span(w, nShapes, N);
 		if (affordable < w) {

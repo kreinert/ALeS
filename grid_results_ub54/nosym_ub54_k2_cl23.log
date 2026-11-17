@@ -1,0 +1,93 @@
+Restart budget reduced to 100 tries.
+Using 1 frozen seed(s).
+Generating 2 seeds of weight 31 for similarity level 0.9 and length of homology region 100
+
+Growing from 1 core-frozen seed(s); flanks may still move.
+ALeS initial seed set is: 
+
+11111111111111111111111000110101011011
+010010001000101000011000010000011111111111111111111111
+
+Computed in 0.000383 seconds
+
+
+Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory
+Estimated Sensitivity will be used to prevent ALeS from Crashing!!!
+
+Creating 262144 QMC windows to estimate sensitivity ...
+Estimated Sensitivity is 0.543755
+
+The program starts computing better seeds ...
+If you reach a set of seeds with your desired sensitivity you can kill the program ... 
+Parallel restarts enabled (4 threads).
+
+ --- random try number 10 --- 
+seeds:
+11111111111111111111111000110101011011
+010010010001010000100010001000011111111111111111111111
+
+Estimated sensitivity = 0.544804
+
+time (since beginning): 0.036442
+
+ --- greedy tail (from try 10) --- 
+seeds:
+11111111111111111111111000110101011011
+010010010001000100100010001000011111111111111111111111
+
+Real sensitivity = 0.545368
+time (since beginning): 2.61997
+
+ --- random try number 45 --- 
+seeds:
+11111111111111111111111000110101011011
+0010100100100101100100011111111111111111111111
+
+Real sensitivity = 0.547241
+time (since beginning): 4.15771
+
+ --- greedy tail (from try 45) --- 
+seeds:
+11111111111111111111111000110101011011
+0010101000100101100100011111111111111111111111
+
+Real sensitivity = 0.547574
+time (since beginning): 5.02448
+
+ --- local search step 7 (from try 45) --- 
+seeds:
+11111111111111111111111000110101011011
+0110101010010011000011111111111111111111111
+
+Real sensitivity = 0.549751
+time (since beginning): 6.18822
+
+ --- local search step 36 (from try 45) --- 
+seeds:
+11111111111111111111111000110101011011
+0110100110010101000011111111111111111111111
+
+Real sensitivity = 0.549822
+time (since beginning): 6.39742
+
+ --- final polish --- 
+
+ --- greedy tail (from try -1) --- 
+seeds:
+11111111111111111111111000110101011011
+0110010110010101000011111111111111111111111
+
+Real sensitivity = 0.549832
+time (since beginning): 6.84705
+Polish findOptimal sensitivity = 0.551043
+
+seeds:
+11111111111111111111111000101001101010011
+0110100110010101000011111111111111111111111
+
+
+Best sensitivity is 0.551043
+
+Computed in 4.15771 seconds
+
+Total time (100 iterations): 8.01585 seconds
