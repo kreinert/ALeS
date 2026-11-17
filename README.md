@@ -107,6 +107,19 @@ If `<symmetryFlag>` is `1` (reverse-doubling), every sensitivity evaluation uses
 
 After an improving batch, ALeSc tries small core slides (the extra `1`s stay put when they remain outside the new core) and a greedy climb of the flanks.
 
+**Search and estimator tuning (ALeSc):**
+
+The estimator uses a fixed low-discrepancy (scrambled Halton) sample of windows and
+common random numbers, so candidate rankings stay stable while the sample is far
+smaller than the old 10^8 draw. Set `ALESC_EST_SAMPLES` (default 262144, range
+1024..100000000) to change it. During random restarts a candidate that cannot beat
+the current best is abandoned early at statistical checkpoints (racing); this only
+affects scoring cost, never which candidate wins. The default is ample for ranking
+candidates; for a borderline feasibility decision, re-run the final configuration
+with `ALESC_EST_SAMPLES=100000000` to recover the old estimator precision.
+`ALESC_REPORT_BOTH=1` prints the exact DP and QMC sensitivities of the final set
+side by side.
+
 **Cite:**
 
 @article{10.1093/bioinformatics/btaa945,

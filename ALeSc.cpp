@@ -10,6 +10,7 @@
 #include <bitset>
 #include <stdint.h>
 #include <mutex>
+#include <vector>
 #if defined(_OPENMP)
 	#include <omp.h>
 #endif
@@ -90,6 +91,10 @@ bool require_palindrome = false;	// palindrome_mode == 1
 bool forbid_palindrome = false;		// palindrome_mode == 2
 double target_sens = 0.0;			// stop as soon as this sensitivity is reached (0 = maximise)
 int max_tries = 0;					// restart budget; 0 means use SEARCH_TRIES
+// The old fixed 10^8 sample array costs 0.4-1.6 GB and a full 10^8 scan per score.
+// A mid-size low-discrepancy sample keeps ranking just as reliable (common random
+// numbers) at a fraction of the cost.
+int array_size = 1 << 18;			// QMC sample count (ALESC_EST_SAMPLES)
 const int MAX_FROZEN = 32;
 int nFrozen = 0;					// Hold this many leading seeds while growing k from k-1
 char frozenSeed[MAX_FROZEN][MAX_SEED_BUF];
@@ -210,9 +215,12 @@ static inline int64_t& oc_ocm(int64_t* ocm, int nSeeds, int a, int b)
 }
 
 int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS);
-double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate = NULL, bool skipSymmetryExpand = false);
+// threshold > 0 lets the estimator abandon candidates that provably cannot beat the
+// current best (statistical racing). Exact DP scoring ignores it.
+double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate = NULL, bool skipSymmetryExpand = false, double threshold = 0.0);
 char** findOptimal(char** seeds, int *l, int NO_SEEDS, long long N, double p, double curSens, int trial, double* outBestSens = NULL, bool* outUsedEstimate = NULL);
 static inline void reverse_copy_seed(const char* src, char* dst, int len);
+void makeHomologousRegion(double p, int N, bool warn = true);
 
 /*
  * Precomputed arrays:
@@ -467,7 +475,7 @@ int seedLength_max_k10H[13][66] = {
 };
 
 typedef __uint128_t uint128_t;
-int const array_size = 100000000;			// size of array (10^8) used for calculating estimated sensitivity
+// array_size is configured at startup (see the estimator globals near the top).
 uint128_t *homologous_array_128;			// can store upto 128 bit long random region
 uint64_t *homologous_array_64;				// can store upto 64 bit long random region
 uint32_t *homologous_array_32;				// can store upto 32 bit long random region
@@ -2015,171 +2023,164 @@ int64_t MULTIPLE_SWAP1_OVERLAPS_FAST(char** SEEDS, int NO_SEEDS)
 
 // create array of size 32 bit or 64 bit or 128 bit according to N
 // used to estimate the sensitivity
-void makeHomologousRegion(double p, int N){
-	
-	{
+// Scrambled Halton: a low-discrepancy point in [0,1)^N, thresholded at p, gives a
+// far more balanced sample of Bernoulli(p) windows than iid draws at the same count.
+// A fixed random shift per coordinate makes it unbiased while keeping every scoring
+// call on exactly the same sample (common random numbers -> stable relative ranking).
+static double halton_unit(unsigned int index, int base)
+{
+	double f = 1.0 / (double)base, u = 0.0;
+	while (index > 0) {
+		u += f * (double)(index % (unsigned int)base);
+		index /= (unsigned int)base;
+		f /= (double)base;
+	}
+	return u;
+}
+
+void makeHomologousRegion(double p, int N, bool warn)
+{
 	std::lock_guard<std::mutex> region_lock(region_mutex);
-	// Guard rather than return: keep the block structured.
-	if(!isRegionCreated){
-	
-	std::random_device rd{}; // use to seed the rng
-	std::mt19937 rng{rd()}; // rng
-	std::bernoulli_distribution distribution(p);
-	
-	cout<<endl<<"Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory"<<endl;
-	cout<<"Estimated Sensitivity will be used to prevent ALeS from Crashing!!!"<<endl<<endl;
-	cout << "Creating array to estimate sensitivity ..." << endl;
-	if(N <= 32){
-		homologous_array_32 = new uint32_t[array_size];
-		for(int i = 0; i < array_size; i++){	
-			uint32_t rn = 0;
-			for(int j = 0; j < N; j++)
-				rn = ((rn<<1)+(distribution(rng)?1:0));
-			homologous_array_32[i] = rn;
+	if (isRegionCreated)
+		return;
+	if (warn) {
+		cout << endl << "Seeds found for which Real Sensitivity cannot be computed because of Insufficient Memory" << endl;
+		cout << "Estimated Sensitivity will be used to prevent ALeS from Crashing!!!" << endl << endl;
+	}
+	cout << "Creating " << array_size << " QMC windows to estimate sensitivity ..." << endl;
+
+	// One coprime base per coordinate. Generate one coordinate at a time and OR it
+	// straight into the region words, so memory stays O(samples), not O(N*samples).
+	std::vector<int> primes;
+	for (int v = 2; (int)primes.size() < N; ++v) {
+		bool prime = true;
+		for (size_t d = 0; d < primes.size() && (long long)primes[d] * primes[d] <= v; ++d)
+			if (v % primes[d] == 0) { prime = false; break; }
+		if (prime) primes.push_back(v);
+	}
+	std::mt19937 rng(0xA1E5C0u); // fixed -> reproducible across runs
+	std::uniform_real_distribution<double> shiftDist(0.0, 1.0);
+
+	if (N <= 32) {
+		homologous_array_32 = new uint32_t[array_size]();
+		for (int j = 0; j < N; ++j) {
+			double sh = shiftDist(rng);
+			uint32_t bitMask = 1u << (N - 1 - j);
+			for (int i = 0; i < array_size; ++i) {
+				double u = halton_unit((unsigned int)(i + 1), primes[j]) + sh;
+				if (u >= 1.0) u -= 1.0;
+				if (u < p) homologous_array_32[i] |= bitMask;
+			}
 		}
 	}
-	else if(N > 32 && N <= 64){
-		homologous_array_64 = new uint64_t[array_size];
-		for(int i = 0; i < array_size; i++){
-			uint64_t rn = 0;
-			for(int j = 0; j < N; j++)
-				rn = ((rn<<1)+(distribution(rng)?1:0));
-			homologous_array_64[i] = rn;
+	else if (N <= 64) {
+		homologous_array_64 = new uint64_t[array_size]();
+		for (int j = 0; j < N; ++j) {
+			double sh = shiftDist(rng);
+			uint64_t bitMask = 1ULL << (N - 1 - j);
+			for (int i = 0; i < array_size; ++i) {
+				double u = halton_unit((unsigned int)(i + 1), primes[j]) + sh;
+				if (u >= 1.0) u -= 1.0;
+				if (u < p) homologous_array_64[i] |= bitMask;
+			}
 		}
 	}
-	else{
-		homologous_array_128 = new uint128_t[array_size];
-		for(int i = 0; i < array_size; i++){
-		uint128_t rn = 0;
-		for(int j = 0; j < N; j++)
-			rn = ((rn<<1)+(distribution(rng)?1:0));
-		homologous_array_128[i] = rn;
+	else {
+		homologous_array_128 = new uint128_t[array_size]();
+		for (int j = 0; j < N; ++j) {
+			double sh = shiftDist(rng);
+			uint128_t bitMask = (uint128_t)1 << (N - 1 - j);
+			for (int i = 0; i < array_size; ++i) {
+				double u = halton_unit((unsigned int)(i + 1), primes[j]) + sh;
+				if (u >= 1.0) u -= 1.0;
+				if (u < p) homologous_array_128[i] |= bitMask;
+			}
 		}
 	}
 	isRegionCreated = true;
-	}
-	}
 }
 
 // Calculate the estimated sensitivity using homologous_array created earlier.
-double ESTIMATE_SENSITIVITY(char** SEEDS, int NO_SEEDS, long long N, bool* outUsedEstimate = NULL)
+// One pass over the QMC windows. When `threshold` is positive we stop at a few
+// checkpoints and abandon a candidate as soon as an upper confidence bound on its
+// hit rate falls below the incumbent. This keeps the incumbent-vs-candidate decision
+// exact (with high probability) while skipping the rest of the scan for losers.
+template <typename T>
+static double estimate_scan(const T* seeds, const int* lens, int nSeeds,
+	const T* regions, long long N, int count, double threshold)
 {
-	int count = 0;
+	int stops[3], nStops = 0;
+	if (threshold > 0.0) {
+		const int cand[3] = {2048, 16384, 65536};
+		for (int t = 0; t < 3; ++t)
+			if (cand[t] < count) stops[nStops++] = cand[t];
+	}
+	int nextStop = 0, hits = 0;
+	for (int j = 0; j < count; ++j) {
+		T region = regions[j];
+		bool hit = false;
+		for (int i = 0; i < nSeeds && !hit; ++i) {
+			int sl = lens[i];
+			if (sl > N)
+				continue;
+			T pattern = seeds[i];
+			for (int sh = 0; sh <= (int)(N - sl); ++sh) {
+				T p = pattern << sh;
+				if ((region & p) == p) { hit = true; break; }
+			}
+		}
+		hits += hit ? 1 : 0;
+		if (nextStop < nStops && j + 1 == stops[nextStop]) {
+			double r = (double)hits / (double)(j + 1);
+			double var = r * (1.0 - r);
+			if (var < 1e-9) var = 1e-9;
+			if (r + 3.0 * sqrt(var / (double)(j + 1)) < threshold)
+				return r; // provably (at 3 sigma) below the incumbent
+			++nextStop;
+		}
+	}
+	return (double)hits / (double)count;
+}
+
+double ESTIMATE_SENSITIVITY(char** SEEDS, int NO_SEEDS, long long N, bool* outUsedEstimate, double threshold)
+{
 	if (outUsedEstimate)
 		*outUsedEstimate = true;
 	else
 		mode = 1;
 	if (N > 128)
 		return -1;
-	if(N <= 32){	//if region length is <= 32
-		uint32_t one_seed = 0, all_seeds[NO_SEEDS], one_region = 0;
-		std::fill_n(all_seeds, NO_SEEDS, 0);
-		if((int)strlen(SEEDS[0]) > (int)N)
-			return 0;
-		// converting seed set from char array to uint32_t array
-		for(int i = 0; i < NO_SEEDS; i++){
-			one_seed = 0;
-			one_seed = std::stoull(SEEDS[i], 0, 2);
-			all_seeds[i] = one_seed;
-		}
-		// calculating the number of hits
-		for(int j = 0; j < array_size; j++){
-			int flag = 0;
-			for(int i = 0; i < NO_SEEDS; i++){
-				if( (int)strlen(SEEDS[i]) > (int)N )
-					continue;
-				one_seed = all_seeds[i];
-				one_region = homologous_array_32[j];
-				for(int k = 0; k <= (int)(N - strlen(SEEDS[i])); k++){
-					if( (one_region & (one_seed<<k)) == (one_seed<<k)){
-						count++;
-						flag = 1;
-						break;
-					}
-				}
-				if(flag == 1)
-					break;
-			} 
-		}
-		return (1.0*count/array_size);
+	if (!isRegionCreated)
+		makeHomologousRegion(p, (int)N);
+	int count = array_size;
+	std::vector<int> lens(NO_SEEDS);
+	for (int i = 0; i < NO_SEEDS; ++i)
+		lens[i] = (int)strlen(SEEDS[i]);
+	if (N <= 32) {
+		std::vector<uint32_t> seeds(NO_SEEDS, 0);
+		for (int i = 0; i < NO_SEEDS; ++i)
+			if (lens[i] <= 32) seeds[i] = (uint32_t)std::stoull(SEEDS[i], 0, 2);
+		return estimate_scan(seeds.data(), lens.data(), NO_SEEDS, homologous_array_32, N, count, threshold);
 	}
-	else if(N > 32 && N <= 64){		//if region length is >32 but <= 64
-			uint64_t one_seed = 0, all_seeds[NO_SEEDS], one_region = 0;
-			std::fill_n(all_seeds, NO_SEEDS, 0);
-			if((int)strlen(SEEDS[0]) > (int)N)
-				return 0;
-			// converting seed set from char array to uint64_t array
-			for(int i = 0; i < NO_SEEDS; i++){
-				one_seed = 0;
-				one_seed = std::stoull(SEEDS[i], 0, 2);
-				all_seeds[i] = one_seed;
-			}
-			// calculating the number of hits
-			for(int j = 0; j < array_size; j++){
-				int flag = 0;
-				for(int i = 0; i < NO_SEEDS; i++){
-					if( (int)strlen(SEEDS[i]) > (int)N )
-						continue;
-					one_seed = all_seeds[i];
-					one_region = homologous_array_64[j];
-					for(int k = 0; k <= (int)(N - strlen(SEEDS[i])); k++){
-						if( (one_region & (one_seed<<k)) == (one_seed<<k)){
-							count++;
-							flag = 1;
-							break;
-						}
-					}
-					if(flag == 1)
-						break;
-				}
-			}
-			return (1.0*count/array_size);
+	if (N <= 64) {
+		std::vector<uint64_t> seeds(NO_SEEDS, 0);
+		for (int i = 0; i < NO_SEEDS; ++i)
+			if (lens[i] <= 64) seeds[i] = std::stoull(SEEDS[i], 0, 2);
+		return estimate_scan(seeds.data(), lens.data(), NO_SEEDS, homologous_array_64, N, count, threshold);
 	}
-	else{			//if region length is >64 but <= 128
-		uint128_t one_seed = 0, all_seeds[NO_SEEDS], one_region = 0;
-		uint64_t upper = 0, lower = 0;
-		std::fill_n(all_seeds, NO_SEEDS, 0);
-		if((int)strlen(SEEDS[0]) >= (int)N)
-			return 0;
-	
-		// converting seed set from char array to uint128_t array
-		for(int i = 0; i < NO_SEEDS; i++){
-			one_seed = 0;
-			if(strlen(SEEDS[i]) < 65){
-				lower = std::stoull(SEEDS[i], 0, 2);
-				one_seed = lower;
-			}
-			else{
-				size_t sl = strlen(SEEDS[i]);
-				lower = std::stoull(std::string(&SEEDS[i][0], &SEEDS[i][64]), 0, 2);
-				upper = std::stoull(std::string(&SEEDS[i][64], &SEEDS[i][sl]), 0, 2);
-				one_seed = upper;
-				one_seed = one_seed<<64;
-				one_seed = one_seed|lower;
-			}
-			all_seeds[i] = one_seed;
+	std::vector<uint128_t> seeds(NO_SEEDS, 0);
+	for (int i = 0; i < NO_SEEDS; ++i) {
+		size_t sl = lens[i];
+		if (sl < 65) {
+			seeds[i] = std::stoull(SEEDS[i], 0, 2);
 		}
-		// calculating the number of hits
-		for(int j = 0; j < array_size; j++){
-			int flag = 0;
-			for(int i = 0; i < NO_SEEDS; i++){
-				if( (int)strlen(SEEDS[i]) > (int)N )
-					continue;
-				one_seed = all_seeds[i];
-				one_region = homologous_array_128[j];
-				for(int k = 0; k <= (int)(N - strlen(SEEDS[i])); k++){
-					if( (one_region & (one_seed<<k)) == (one_seed<<k)){
-						count++;
-						flag = 1;
-						break;
-					}
-				}
-				if(flag == 1)
-					break;
-			} 
+		else {
+			uint64_t upper = std::stoull(std::string(&SEEDS[i][0], &SEEDS[i][64]), 0, 2);
+			uint64_t lower = std::stoull(std::string(&SEEDS[i][64], &SEEDS[i][sl]), 0, 2);
+			seeds[i] = ((uint128_t)upper << 64) | (uint128_t)lower;
 		}
-		return (1.0*count/array_size);
 	}
+	return estimate_scan(seeds.data(), lens.data(), NO_SEEDS, homologous_array_128, N, count, threshold);
 }
 
 // converts the reversed of the binary string s into integer
@@ -2266,12 +2267,12 @@ int max_affordable_span(int weight, int nShapes, long long N)
 }
 
 // Computing sensitivity of a set of SEEDS with the given parameters using the dynamic programming of (Li et al., 2004)
-double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate, bool skipSymmetryExpand)
+double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, double totalVirtualMem, bool* outUsedEstimate, bool skipSymmetryExpand, double threshold)
 {
 	if (require_symmetry && !skipSymmetryExpand) {
 		int nSym = 0;
 		char** sym = expand_with_reverses(SEEDS, NULL, NO_SEEDS, &nSym);
-		return MultipleSensitivity(sym, nSym, N, P, totalVirtualMem, outUsedEstimate, true);
+		return MultipleSensitivity(sym, nSym, N, P, totalVirtualMem, outUsedEstimate, true, threshold);
 	}
 	bool usedEstimate = false;
 	if (outUsedEstimate)
@@ -2309,7 +2310,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 			return -1;
 		}
 		makeHomologousRegion(P, N);
-		return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate);
+		return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate, threshold);
 	}
 	for (i=0; i<=NO_SEEDS-1; i++)
 		INT_REV_SEEDS[i] = BinReversedToInt(SEEDS[i]); // !!! this works like * = 0
@@ -2355,7 +2356,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 				return -1;
 			}
 			makeHomologousRegion(P, N);
-			return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate);
+			return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate, threshold);
 		}
 		MAX_NO_BS = (long long)maxNodesL;
 		long long NO_BS = MAX_NO_BS;
@@ -2476,7 +2477,7 @@ double MultipleSensitivity(char** SEEDS, int NO_SEEDS, long long N, double P, do
 		result = f[N][0];
 	}
 	catch(std::bad_alloc){
-		return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate);
+		return ESTIMATE_SENSITIVITY(SEEDS, NO_SEEDS, N, outUsedEstimate, threshold);
 	}
 	if (!outUsedEstimate)
 		mode = usedEstimate;
@@ -3051,7 +3052,10 @@ double RANDOM_START_SWAP_FOR_OC_WITH_RANDOM_LENGTH(int m, int M, int weight, int
 			}
 
 			bool curUsedEstimate = false;
-			double curSens = MultipleSensitivity(localSeeds, nSeeds, N, p, totalVirtualMem, &curUsedEstimate);
+			// Racing threshold is the batch snapshot, so a torn read of bestSens is
+			// impossible and rejections only use a conservative bar.
+			double curSens = MultipleSensitivity(localSeeds, nSeeds, N, p, totalVirtualMem,
+				&curUsedEstimate, false, batchSens);
 			if (curSens != -1) {
 				int minLen = localLen[0], maxLen = localLen[0];
 				for (int si = 0; si < nSeeds; si++) {
@@ -3386,6 +3390,12 @@ int main(int argc, char **argv)
 		max_tries = SEARCH_TRIES;
 	if (max_tries != SEARCH_TRIES)
 		cout << "Restart budget reduced to " << max_tries << " tries." << endl;
+	const char* samplesEnv = getenv("ALESC_EST_SAMPLES");
+	if (samplesEnv) {
+		long v = atol(samplesEnv);
+		if (v >= 1024 && v <= 100000000) array_size = (int)v;
+		cout << "Estimator sample count set to " << array_size << endl;
+	}
 	nFrozen = 0;
 	
 	l = NULL;		// seeds' lengths array (allocated after validation)
@@ -3483,6 +3493,25 @@ int main(int argc, char **argv)
 			S[i][0] = '\0';
 		}
 		ALeS(S);
+		if (getenv("ALESC_REPORT_BOTH") && S && S[0][0]) {
+			int nShapes = k;
+			char** shapes = S;
+			if (require_symmetry) {
+				int ns = 0;
+				shapes = expand_with_reverses(S, NULL, k, &ns);
+				nShapes = ns;
+			}
+			bool used = false;
+			double tA = clock() / 1000000.0;
+			double exact = MultipleSensitivity(shapes, nShapes, N, p, totalVirtualMem,
+				&used, true, 0.0);
+			double tB = clock() / 1000000.0;
+			makeHomologousRegion(p, N, false);
+			double est = ESTIMATE_SENSITIVITY(shapes, nShapes, N, &used, 0.0);
+			double tC = clock() / 1000000.0;
+			cout << "Diagnostic exact=" << exact << " (" << (tB - tA) << "s) qmc=" << est
+				<< " (" << (tC - tB) << "s) delta=" << (est - exact) << endl;
+		}
 	}catch(std::bad_alloc){
 		cerr << "Memory error (Allocation failed)"<<endl
 		<<"You probably need more memory to run this program"<<endl;
